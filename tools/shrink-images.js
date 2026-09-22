@@ -6,7 +6,7 @@
  *  体积大概能降到十分之一。不依赖任何 npm 包。
  *
  *  用法：
- *      node tools/shrink-images.js                 压缩 assets/img 里所有图
+ *      node tools/shrink-images.js                 压缩 img 里所有图
  *      node tools/shrink-images.js --max 520       改长边尺寸
  *      node tools/shrink-images.js --quality 0.88  改 JPEG 质量
  * ============================================================ */
@@ -15,7 +15,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
-const IMG_DIR = path.join(ROOT, 'assets', 'img');
+const IMG_DIR = path.join(ROOT, 'img');
 
 const argv = process.argv.slice(2);
 function arg(n, d) { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d; }
@@ -32,7 +32,7 @@ const BROWSER = EDGE_CANDIDATES.find(p => fs.existsSync(p));
 if (!BROWSER) { console.error('没找到 Edge 或 Chrome，无法压缩。'); process.exit(1); }
 
 const files = fs.readdirSync(IMG_DIR).filter(f => /\.(jpe?g|png|webp)$/i.test(f));
-if (!files.length) { console.log('assets/img 里没有图片。'); process.exit(0); }
+if (!files.length) { console.log('img 里没有图片。'); process.exit(0); }
 
 const before = files.reduce((s, f) => s + fs.statSync(path.join(IMG_DIR, f)).size, 0);
 console.log('待压缩 ' + files.length + ' 张，共 ' + (before / 1048576).toFixed(1) + ' MB');
@@ -132,12 +132,12 @@ if (fs.existsSync(MANIFEST_JS)) {
 const map = win.IMG_MANIFEST || {};
 Object.keys(map).forEach(id => {
   const base = path.basename(map[id]);
-  if (converted[base]) map[id] = 'assets/img/' + converted[base];
+  if (converted[base]) map[id] = '' + converted[base];
 });
 // 把目录里实际存在的图也登记上
 fs.readdirSync(IMG_DIR).forEach(f => {
   const mm = f.match(/^([a-z0-9-]+)\.(jpe?g|png|webp)$/i);
-  if (mm) map[mm[1]] = 'assets/img/' + f;
+  if (mm) map[mm[1]] = '' + f;
 });
 const keys = Object.keys(map).sort();
 fs.writeFileSync(MANIFEST_JS,

@@ -9,7 +9,7 @@
  *      node tools/fetch-images.js --q "自定义搜索词"   （配 --only 用单条测试）
  *
  *  逻辑：拿「品牌 + 品名 + 容量」去 Bing 图片搜，挑一张能下下来的存到
- *  assets/img/<id>.<ext>，同时更新 assets/img/manifest.js。
+ *  img/<id>.<ext>，同时更新 img/manifest.js。
  *  前端 js/art.js 会优先用这里的图，没有才退回自动生成的矢量图。
  *
  *  说明：搜到的多是天猫/京东官方旗舰店的商品图。本库是非商业的个人整理，
@@ -22,7 +22,7 @@ const https = require('https');
 const http = require('http');
 
 const ROOT = path.join(__dirname, '..');
-const IMG_DIR = path.join(ROOT, 'assets', 'img');
+const IMG_DIR = path.join(ROOT, 'img');
 const MANIFEST_JS = path.join(IMG_DIR, 'manifest.js');
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -146,7 +146,7 @@ function saveManifest(map) {
   const body = keys.map(k => '  ' + JSON.stringify(k) + ': ' + JSON.stringify(map[k])).join(',\n');
   fs.writeFileSync(MANIFEST_JS,
     '/* 自动生成，请勿手改。重新抓取：node tools/fetch-images.js\n'
-    + '   手动补图：把图片存成 assets/img/<饮料id>.jpg，再跑一次本脚本即可收录。 */\n'
+    + '   手动补图：把图片存成 img/<饮料id>.jpg，再跑一次本脚本即可收录。 */\n'
     + 'window.IMG_MANIFEST = {\n' + (body ? body + '\n' : '') + '};\n', 'utf8');
 }
 
@@ -155,10 +155,10 @@ function saveManifest(map) {
   if (!fs.existsSync(IMG_DIR)) fs.mkdirSync(IMG_DIR, { recursive: true });
   const manifest = loadManifest();
 
-  // 把 assets/img 里已存在的文件也纳入 manifest（方便手动补图）
+  // 把 img 里已存在的文件也纳入 manifest（方便手动补图）
   fs.readdirSync(IMG_DIR).forEach(f => {
     const m = f.match(/^([a-z0-9-]+)\.(jpe?g|png|webp)$/i);
-    if (m) manifest[m[1]] = 'assets/img/' + f;
+    if (m) manifest[m[1]] = '' + f;
   });
 
   let targets = BEV.filter(worthFetching);
@@ -184,7 +184,7 @@ function saveManifest(map) {
           const { buf, ext } = await tryDownload(u);
           const file = b.id + '.' + ext;
           fs.writeFileSync(path.join(IMG_DIR, file), buf);
-          manifest[b.id] = 'assets/img/' + file;
+          manifest[b.id] = '' + file;
           saveManifest(manifest);
           ok++;
           console.log(tag + '  ✓ ' + file + '  ' + Math.round(buf.length / 1024) + 'KB   « ' + q + ' »');

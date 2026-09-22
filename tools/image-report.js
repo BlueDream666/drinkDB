@@ -11,11 +11,11 @@ fs.readdirSync(dataDir).filter(f => f.endsWith('.js'))
 
 const manifest = (function () {
   const win = {};
-  new Function('window', fs.readFileSync(path.join(ROOT, 'assets', 'img', 'manifest.js'), 'utf8'))(win);
+  new Function('window', fs.readFileSync(path.join(ROOT, 'img', 'manifest.js'), 'utf8'))(win);
   return win.IMG_MANIFEST || {};
 })();
 
-const IMG = path.join(ROOT, 'assets', 'img');
+const IMG = path.join(ROOT, 'img');
 const files = fs.readdirSync(IMG).filter(f => /\.(jpe?g|png|webp)$/i.test(f));
 let total = 0;
 const sizes = files.map(f => { const s = fs.statSync(path.join(IMG, f)).size; total += s; return { f, s }; });

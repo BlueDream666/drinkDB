@@ -11,6 +11,9 @@ _*.html
 _*.png
 _temp/
 
+# 单文件版是构建产物，随时可用 node tools/build-single.js 重新生成
+饮库-单文件版.html
+
 # 编辑器
 .vscode/
 .idea/

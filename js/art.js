@@ -31,6 +31,9 @@
   }
   function hsl(h, s, l) { return 'hsl(' + ((h % 360) + 360) % 360 + ',' + s + '%,' + l + '%)'; }
 
+  /* 产品图可能放的位置，按顺序试。图片放 img/ 还是 assets/img/ 都能认出来。 */
+  var IMG_DIRS = ['img/', 'assets/img/'];
+
   /* ---------- 各形状 ---------- */
   var DRAW = {
     can: function (liq, cap, accent) {
@@ -92,30 +95,15 @@
     },
   };
 
-  /**
-   * 生成一款饮料的图
-   *   ① 数据里写了 img（线上图片地址）→ 用它
-   *   ② assets/img/manifest.js 里登记了本地图 → 用它
-   *   ③ 都没有 → 现场画一张矢量图
-   * @param {object} b    饮料对象
-   * @param {number} size 目标显示宽度(px)
-   */
-  global.drinkArt = function (b, size) {
-    size = size || 96;
-    var boxW = size, boxH = Math.round(size * 1.5);
-    var local = (global.IMG_MANIFEST && global.IMG_MANIFEST[b.id]) || b.img || '';
-    if (local) {
-      return '<img class="art-img" src="' + local + '" alt="' + b.n + '" loading="lazy" '
-        + 'width="' + boxW + '" height="' + boxH + '" '
-        + 'style="width:' + boxW + 'px;height:' + boxH + 'px">';
-    }
+  /** 只画矢量图（不带图片尝试） */
+  function svgArt(b, size) {
     var st = SHAPES[b.c] || SHAPES['其他'];
     var k = hash(b.id || b.n);
     var hue = st.h + (k % 22) - 11;
     var lit = Math.max(18, Math.min(92, st.lit + ((k >> 5) % 14) - 7));
     var sat = Math.max(4, Math.min(90, st.sat + ((k >> 9) % 12) - 6));
 
-    // 有气就加气泡，含奶就偏白，代糖就降饱和
+    // 有气就加气泡，含奶就偏白
     var liquid = hsl(hue, b.dairy ? Math.max(10, sat - 18) : sat, b.dairy ? Math.min(96, lit + 26) : lit);
     var cap = st.cap;
     var accent = hsl(hue, Math.min(90, sat + 12), Math.max(20, lit - 20));
@@ -138,9 +126,69 @@
 
     return '<svg class="art-svg" viewBox="0 0 120 180" width="' + size + '" height="' + Math.round(size * 1.5) + '" '
       + 'style="width:' + size + 'px;height:' + Math.round(size * 1.5) + 'px" role="img" '
-      + 'aria-label="' + b.n + ' 示意图">'
+      + 'aria-label="' + attr(b.n) + ' 示意图">'
       + '<ellipse cx="60" cy="166" rx="30" ry="6" fill="#000" opacity=".07"/>'
       + svg + '</svg>';
+  }
+
+  function attr(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+  function findBev(id) {
+    var all = global.__ALL_BEV__ || global.BEV || [];
+    for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
+    return null;
+  }
+
+  /**
+   * 产品图加载失败时的兜底：
+   *   ① 还有备用目录没试 → 换下一个（图片放 img/ 还是 assets/img/ 都能认）
+   *   ② 全试过了 → 直接换成矢量图，页面上永远不会出现裂图
+   */
+  global.drinkArtFail = function (img) {
+    var rest = img.getAttribute('data-cand') || '';
+    if (rest) {
+      var parts = rest.split('|');
+      img.setAttribute('data-cand', parts.slice(1).join('|'));
+      img.src = parts[0];
+      return;
+    }
+    var b = findBev(img.getAttribute('data-bev'));
+    var w = parseInt(img.getAttribute('width'), 10) || 96;
+    if (b) img.outerHTML = svgArt(b, w);
+    else img.style.display = 'none';
+  };
+
+  /**
+   * 生成一款饮料的图
+   *   ① manifest 里登记了本地图 → 用它（会依次尝试 IMG_DIRS 里的目录）
+   *   ② 数据里写了 img（外部图片地址）→ 用它
+   *   ③ 都没有 / 都加载失败 → 现场画一张矢量图
+   * @param {object} b    饮料对象
+   * @param {number} size 目标显示宽度(px)
+   */
+  global.drinkArt = function (b, size) {
+    size = size || 96;
+    var boxW = size, boxH = Math.round(size * 1.5);
+    var file = (global.IMG_MANIFEST && global.IMG_MANIFEST[b.id]) || '';
+
+    // manifest 里现在只存文件名；也兼容旧版存的 "assets/img/xxx.jpg" 这种带目录的写法
+    var cands = [];
+    if (file) {
+      if (file.indexOf('/') >= 0) cands.push(file);
+      else for (var i = 0; i < IMG_DIRS.length; i++) cands.push(IMG_DIRS[i] + file);
+    }
+    if (b.img) cands.push(b.img);
+
+    if (cands.length) {
+      return '<img class="art-img" src="' + attr(cands[0]) + '"'
+        + ' data-cand="' + attr(cands.slice(1).join('|')) + '"'
+        + ' data-bev="' + attr(b.id) + '"'
+        + ' alt="' + attr(b.n) + '" loading="lazy" decoding="async"'
+        + ' width="' + boxW + '" height="' + boxH + '"'
+        + ' style="width:' + boxW + 'px;height:' + boxH + 'px"'
+        + ' onerror="drinkArtFail(this)">';
+    }
+    return svgArt(b, size);
   };
 
   /* 星级渲染：0–5 星，支持半星 */
