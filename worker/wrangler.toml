@@ -1,29 +1,22 @@
 # 饮库 DrinkDB —— Worker 配置
 #
-# 这是给 wrangler 命令行用的。如果你照 README 走「网页版」流程，
-# 这份文件用不上，忽略它也行。
+# 这个文件是给 wrangler 命令行用的。
+# 跑 tools/deploy-worker.ps1 时会读它，所以数据库 ID 已经填好了。
 
-name = "drinkdb-api"
+name = "drinkdb"
 main = "index.js"
-compatibility_date = "2024-11-01"
+compatibility_date = "2025-01-01"
 
 # 允许哪些网站来调这个接口。
-# 换成你自己的地址，比 "*" 安全；本地调试可以先用 "*"。
+# "*" 表示不限制。想收紧就换成你自己的地址，例如：
+#   ALLOWED_ORIGIN = "https://bluedream666.github.io"
 [vars]
 ALLOWED_ORIGIN = "*"
 
-# D1 数据库。创建后把 database_id 填到这里。
-# 命令行：wrangler d1 create drinkdb
 [[d1_databases]]
 binding = "DB"
 database_name = "drinkdb"
-database_id = "把 Cloudflare 给你的那一串 id 填这里"
+database_id = "f65256ef-eb39-49a6-aeaa-5745541adc86"
 
-# 可选：频率限制用的 KV。不配也能跑，只是少一层防刷。
-# 命令行：wrangler kv namespace create RATE
-# [[kv_namespaces]]
-# binding = "RATE"
-# id = "把 KV 的 id 填这里"
-
-# 管理口令不要写在这个文件里（会被提交到仓库），用命令行设置：
-#   wrangler secret put ADMIN_TOKEN
+# 管理口令不写在这里（会被提交到仓库），用命令设置：
+#   npx wrangler secret put ADMIN_TOKEN
