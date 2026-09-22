@@ -107,61 +107,63 @@
 
 ## 三、创建 Worker（5 分钟）
 
-> **注意**：Cloudflare 的界面文字改过好几版。下面按 **2026 年官方文档**的写法来：
-> [First Worker](https://developers.cloudflare.com/learning-paths/workers/get-started/first-worker/)
-> 现在写的是 `Create application` → `Create Worker` → `Deploy`。
-> 如果你找不到某个按钮，直接跳到本文最后「命令行路线」，那条路更稳。
+> Cloudflare 的界面文字改过好几版，新旧文档能查到不同说法。**下面按你实际会看到的界面写。**
 
 1. 打开 <https://dash.cloudflare.com/?to=/:account/workers-and-pages>
-2. 点右上角 **Create application**（不是 "Create"）
-3. 这一步会进到一个新页面，里面选 **Create Worker** → **Deploy**
 
-   > 如果点了 **Create application** 之后页面卡住或者没反应：
-   > 刷新一下，或者换 Chrome / Edge 打开。这个页面偶尔会加载得很慢。
-   > 实在进不去就往下看「命令行路线」。
+2. 点右上角蓝色的 **Create application**
 
-4. 给它起个名字，比如：
+3. 这时会进到一个标题是 **Create an app → Make something new** 的页面，上面有几个选项：
+
+   - Connect GitHub
+   - Connect with GitLab
+   - **Start with Hello World!**　← **点这个**
+   - Select a template
+   - Upload your static files
+
+   页面最下面那行小字「Need to use the legacy Pages workflow? **Continue to Pages**」
+   是给纯静态网站用的，我们不用管。
+
+4. 点了 **Start with Hello World!** 之后会让你给 Worker 起名字，填：
 
    ```
    drinkdb-api
    ```
 
-   点 **Deploy**。等几秒，你会得到一个网址，长这样：
+   再点 **Deploy**。等几秒，你会得到一个网址：
 
    ```
-   https://drinkdb-api.你的用户名.workers.dev
+   https://drinkdb-api.你的子域.workers.dev
    ```
 
-   **记住这个网址**，后面要用。
+   **先把这行网址复制下来**，后面还要用。
 
-5. 点 **Edit code**（编辑代码），把编辑器里原来的示例代码**全选删掉**，
-   换成 `worker/index.js` 的**全部内容**，点右上角 **Deploy**
+5. 页面上有 **Edit code**（编辑代码）的入口。点进去，
+   把编辑器里原来的示例代码**全选删掉**，换成 `worker/index.js` 的**全部内容**，
+   点右上角 **Deploy** 保存。
 
-6. 验证一下：浏览器打开
+6. 验证：浏览器打开你的 Worker 网址（结尾加个斜杠）：
 
    ```
-   https://drinkdb-api.你的用户名.workers.dev/
+   https://drinkdb-api.你的子域.workers.dev/
    ```
 
    看到 `{"ok":true,"service":"饮库 DrinkDB API",...}` 就成了。
 
-### 命令行路线（网页上点不动就走这条）
+### 如果网页上点不动，走命令行
 
-你机器上已经有 Node.js，所以可以直接用官方的 `wrangler` 工具部署，
-**完全不用碰 Cloudflare 的网页界面**。
-
-在 `F:\饮料统计\ds` 下打开 PowerShell：
+你机器上已经有 Node.js，可以直接用官方的 `wrangler` 部署，**完全不用碰 Cloudflare 网页界面**：
 
 ```powershell
-.\tools\deploy-worker.ps1
+cd F:\饮料统计\ds
+.	ools\deploy-worker.ps1
 ```
 
-脚本会一步步带你走完：登录 → 建数据库 → 建表 → 部署 → 设口令。
-每一步都会停下来让你看清楚，失败了重跑就行（已完成的会自动跳过）。
+脚本会带你走完：登录 → 建数据库 → 建表 → 部署 → 设口令。
+每步都停下来让你看清楚，失败了重跑（已完成的自动跳过）。
+**它会自己把数据库 ID 写进 `worker/wrangler.toml`。**
 
-**它会自己把数据库 ID 写进 `worker/wrangler.toml`**，不用你手动填。
-
-> 想自己敲也行，命令是这几条：
+> 想自己敲也行：
 >
 > ```powershell
 > cd F:\饮料统计\ds\worker
@@ -169,8 +171,10 @@
 > npx wrangler d1 create drinkdb          # 记下输出的 database_id，填进 wrangler.toml
 > npx wrangler d1 execute drinkdb --remote --file=schema.sql
 > npx wrangler deploy
-> npx wrangler secret put ADMIN_TOKEN     # 输入时屏幕不显示字符，是正常的
+> npx wrangler secret put ADMIN_TOKEN     # 输入时不显示字符，是正常的
 > ```
+>
+> 你数据库和表都建好了，所以第 2、3 条可以跳过。
 
 ---
 
