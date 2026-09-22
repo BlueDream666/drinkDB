@@ -37,6 +37,14 @@
     renderAll();
   }
 
+  /** 线上模式：口令交给服务器验；本地模式：比对本机摘要 */
+  function guard() {
+    if (window.DrinkUser && window.DrinkUser.online) {
+      return window.DrinkUser.loginAdmin($('#pass').value);
+    }
+    return Promise.resolve(window.Store.login($('#pass').value));
+  }
+
   $('#loginForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var btn = $('#loginBtn'), inp = $('#pass');
@@ -47,32 +55,99 @@
       return;
     }
 
-    // 口令校验在浏览器里做，加一点点延迟，抬高暴力猜的成本
     var pass = inp.value;
     btn.disabled = true;
+    // 加一点延迟，抬高暴力猜的成本
     setTimeout(function () {
-      if (window.Store.login(pass)) {
-        inp.value = '';
-        $('#loginErr').textContent = '';
+      guard().then(function (ok) {
         btn.disabled = false;
-        showPanel();
-        return;
-      }
-      var n = window.Store.failCount();
-      btn.disabled = false;
-      if (n >= MAX_TRIES) {
-        setLock();
-        $('#loginErr').textContent = '错 ' + n + ' 次了，锁一分钟。';
-      } else {
-        $('#loginErr').textContent = '口令不对。（已错 ' + n + ' 次，满 ' + MAX_TRIES + ' 次锁一分钟）';
-      }
-      inp.value = '';
-      inp.focus();
+        if (ok) {
+          inp.value = '';
+          $('#loginErr').textContent = '';
+          showPanel();
+          return;
+        }
+        var n = window.DrinkUser && window.DrinkUser.online
+          ? (parseInt(localStorage.getItem('drinkdb.adminTries') || '0', 10) + 1)
+          : window.Store.failCount();
+        try { localStorage.setItem('drinkdb.adminTries', String(n)); } catch (err) {}
+        if (n >= MAX_TRIES) {
+          setLock();
+          $('#loginErr').textContent = '错 ' + n + ' 次了，锁一分钟。';
+        } else {
+          $('#loginErr').textContent = '口令不对。（已错 ' + n + ' 次，满 ' + MAX_TRIES + ' 次锁一分钟）';
+        }
+        inp.value = '';
+        inp.focus();
+      });
     }, 600);
   });
   $('#logoutBtn').addEventListener('click', function () {
     window.Store.logout();
+    if (window.DrinkUser && window.DrinkUser.logoutAdmin) window.DrinkUser.logoutAdmin();
     showGate();
+  });
+
+  /* ============================ 待审：评论与建议 ============================ */
+  function renderUserQueue() {
+    var box = $('#userQueue');
+    if (!box) return;
+    if (!window.DrinkUser || !window.DrinkUser.online) {
+      box.innerHTML = '<p style="color:var(--muted)">'
+        + '还没配后端，所以收不到网友的点赞和评论。<br>'
+        + '配好后端（见 <code>worker/README.md</code>，全程网页操作十几分钟）这里就会出现待审的评论和建议。</p>';
+      return;
+    }
+    box.innerHTML = '<p style="color:var(--muted)">正在拉取…</p>';
+    window.DrinkUser.pending().then(function (d) {
+      var c = d.comments || [], s = d.suggestions || [];
+      var html = '';
+      if (!c.length && !s.length) {
+        html = '<p style="color:var(--muted)">没有待审的评论和建议。</p>';
+      }
+      if (c.length) {
+        html += '<h3 class="lab-sub">待审评论 ' + c.length + ' 条</h3>';
+        html += c.map(function (x) {
+          return '<div class="item">'
+            + '<div class="top"><span class="nm">' + esc(x.by) + '</span>'
+            + '<span class="meta">' + esc(x.bev) + '</span>'
+            + '<span class="tag wait">待审</span>'
+            + '<span class="meta" style="margin-left:auto">' + esc(String(x.at).replace('T', ' ').slice(0, 16)) + '</span></div>'
+            + '<div class="kv" style="color:var(--text)">' + esc(x.body) + '</div>'
+            + '<div class="acts">'
+            + '<button class="tb fill" data-umod="comment" data-id="' + x.dbId + '" data-ok="1">放行</button>'
+            + '<button class="tb" data-umod="comment" data-id="' + x.dbId + '" data-ok="0">退回</button>'
+            + '</div></div>';
+        }).join('');
+      }
+      if (s.length) {
+        html += '<h3 class="lab-sub">待处理建议 ' + s.length + ' 条</h3>';
+        html += s.map(function (x) {
+          return '<div class="item">'
+            + '<div class="top"><span class="nm">' + esc(x.by) + '</span>'
+            + '<span class="tag wait">待处理</span>'
+            + '<span class="meta" style="margin-left:auto">' + esc(String(x.at).replace('T', ' ').slice(0, 16)) + '</span></div>'
+            + '<div class="kv" style="color:var(--text)">' + esc(x.body) + '</div>'
+            + '<div class="acts">'
+            + '<button class="tb fill" data-umod="suggest" data-id="' + x.dbId + '" data-ok="1">已阅</button>'
+            + '<button class="tb" data-umod="suggest" data-id="' + x.dbId + '" data-ok="0">归档</button>'
+            + '</div></div>';
+        }).join('');
+      }
+      box.innerHTML = html;
+    }).catch(function (e) {
+      box.innerHTML = '<p style="color:var(--bad)">拉取失败：' + esc(e.message)
+        + '<br>检查一下 admin 口令对不对、Worker 是不是还在。</p>';
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-umod]');
+    if (!b) return;
+    b.disabled = true;
+    window.DrinkUser.moderate(b.dataset.umod, b.dataset.id, b.dataset.ok === '1')
+      .then(function () { toast('处理好了'); renderUserQueue(); })
+      .catch(function (err) { b.disabled = false; toast('失败：' + err.message); });
   });
 
   /* ============================ 渲染 ============================ */
@@ -86,6 +161,9 @@
     renderQueue();
     renderApproved();
     renderRejected();
+    renderUserQueue();
+    var md = $('#modeLine');
+    if (md) md.textContent = window.DrinkUser ? window.DrinkUser.modeName() : '—';
   }
 
   function kv(b) {

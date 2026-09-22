@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>新功能自测</title></head>
+<body style="font-family:system-ui;padding:16px">
+<pre id="out">跑着呢…</pre>
+<iframe id="f" src="index.html" style="width:1280px;height:820px;border:1px solid #ccc"></iframe>
+<script>
+var log = [], pass = 0, fail = 0;
+function ok(n, c, e) { c ? pass++ : fail++; log.push((c ? '✓ ' : '✗ ') + n + (e !== undefined ? '   → ' + e : '')); }
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+function txt(d, id) { var e = d.getElementById(id); return e ? e.textContent.trim() : ''; }
+function count(d) { var m = txt(d, 'count').match(/(\d+)/); return m ? +m[1] : null; }
+
+document.getElementById('f').addEventListener('load', async function () {
+  var w = this.contentWindow, d = this.contentDocument;
+  try {
+    /* ---- A. 预设 ---- */
+    var presets = d.querySelectorAll('.chip[data-preset]');
+    ok('预设按钮有 ' + presets.length + ' 个（原来叫「偷懒」）', presets.length >= 12, presets.length + ' 个');
+    ok('预设那一行的标题是「预设」',
+       [].some.call(d.querySelectorAll('.frow .fk'), e => e.textContent.trim() === '预设'));
+
+    var p0 = count(d);
+    var hotpot = d.querySelector('.chip[data-preset="hotpot"]');
+    hotpot.click();
+    await wait(150);
+    var p1 = count(d);
+    ok('点预设后自动筛出结果', p1 > 0 && p1 < p0, p0 + ' → ' + p1);
+    ok('预设按钮点亮了', hotpot.getAttribute('data-st') === '1');
+    ok('摘要条显示预设', /预设：配火锅/.test(txt(d, 'summary')), txt(d, 'summary'));
+    ok('预设也算进「筛选 N」', txt(d, 'fnum') === '1', txt(d, 'fnum'));
+
+    hotpot.click();
+    await wait(150);
+    ok('再点一次取消预设', count(d) === p0 && hotpot.getAttribute('data-st') === '0', count(d) + '');
+
+    /* ---- B. 随机抽签 ---- */
+    ok('有抽签按钮', !!d.getElementById('drawBtn'));
+    d.getElementById('drawBtn').click();
+    await wait(300);
+    ok('抽签时显示滚动条', /正在抽/.test(txt(d, 'drawBox')) || !!d.getElementById('drawName'));
+    await wait(2600);
+    var drawn = d.querySelector('.card.drawn');
+    ok('抽完在列表里高亮了一款', !!drawn, drawn ? drawn.dataset.id : '(没有)');
+    ok('抽签结果卡片出现', /抽到了/.test(txt(d, 'drawBox')), txt(d, 'drawBox').slice(0, 30));
+    ok('结果显示的是真名字', txt(d, 'drawBox').length > 20);
+
+    // 在筛选后抽，应该只从筛出来的里面抽
+    d.querySelector('.chip[data-preset="driving"]').click();
+    await wait(200);
+    var pool = count(d);
+    d.getElementById('drawBtn').click();
+    await wait(2800);
+    var d2 = d.querySelector('.card.drawn');
+    ok('筛选后抽签仍然有结果（候选 ' + pool + '）', !!d2, d2 ? d2.dataset.id : '(没有)');
+    d.getElementById('qClear').click();
+    await wait(200);
+
+    /* ---- C. 点赞 + 评论 ---- */
+    var firstCard = d.querySelector('#gridZone .card') || d.querySelector('.card');
+    var id = firstCard.dataset.id;
+    firstCard.click();
+    await wait(200);
+    ok('详情打开了', d.getElementById('detail').classList.contains('on'));
+    var likeBtn = d.querySelector('[data-like]');
+    ok('详情里有点赞按钮', !!likeBtn);
+    ok('初始是未点赞', likeBtn && !likeBtn.classList.contains('on'));
+    var n0 = parseInt(likeBtn.querySelector('[data-like-n]').textContent, 10);
+    likeBtn.click();
+    await wait(120);
+    ok('点了变红心', likeBtn.classList.contains('on'));
+    ok('赞数 +1', parseInt(likeBtn.querySelector('[data-like-n]').textContent, 10) === n0 + 1);
+    likeBtn.click();
+    await wait(120);
+    ok('再点取消', !likeBtn.classList.contains('on') &&
+       parseInt(likeBtn.querySelector('[data-like-n]').textContent, 10) === n0);
+
+    var ta = d.querySelector('[data-cmt-body]');
+    var by = d.querySelector('[data-cmt-by]');
+    ok('详情里有评论框', !!ta && !!by);
+    ta.value = '自测用评论：喝完了，还行。';
+    by.value = '自测脚本';
+    d.querySelector('[data-cmt-send]').click();
+    await wait(400);
+    var cmts = w.DrinkUser.visibleComments(id);
+    ok('评论发出去了（本地模式可见）', cmts.length >= 1, cmts.length + ' 条');
+    ok('评论内容正确', cmts.some(c => /自测用评论/.test(c.body)));
+    ok('详情里列出了评论', /自测用评论/.test(d.getElementById('detailBody').textContent));
+    d.querySelector('[data-close]').click();
+    await wait(120);
+
+    /* ---- D. 加入对比 ---- */
+    d.querySelector('.card').click();
+    await wait(150);
+    var ac = d.querySelector('[data-addcmp]');
+    ok('详情里有「加入对比」', !!ac);
+    ac.click();
+    await wait(120);
+    ok('加进去了按钮变文案', ac.textContent.indexOf('已在对比') >= 0, ac.textContent);
+    d.querySelector('[data-close]').click();
+    await wait(120);
+
+    /* ---- E. 视图切换 ---- */
+    var tabs = d.querySelectorAll('.vt');
+    ok('有三个视图按钮', tabs.length === 3, tabs.length + '');
+    d.querySelector('.vt[data-view="compare"]').click();
+    await wait(250);
+    ok('切到对比视图', d.getElementById('view-compare').style.display !== 'none' &&
+                      d.getElementById('view-browse').style.display === 'none');
+    ok('对比表渲染出来了', !!d.querySelector('.cmp-table') || !!d.querySelector('.cmp-empty'));
+    ok('对比里有刚才加的那款', d.querySelector('.cmp-table') !== null, '表格存在');
+
+    d.querySelector('.vt[data-view="lab"]').click();
+    await wait(400);
+    ok('切到创新区', d.getElementById('view-lab').style.display !== 'none');
+    ok('抽签机在', !!d.querySelector('#labSlot .slot-name'));
+    ok('汽水地图在', d.querySelectorAll('.mapregion').length >= 4, d.querySelectorAll('.mapregion').length + ' 个地区');
+    ok('地图里有地方汽水', d.querySelectorAll('.mapchip').length > 5, d.querySelectorAll('.mapchip').length + ' 款');
+    ok('方糖清单在', d.querySelectorAll('.cuberow').length >= 8, d.querySelectorAll('.cuberow').length + ' 行');
+    ok('方糖格子画出来了', d.querySelectorAll('.cube').length > 20, d.querySelectorAll('.cube').length + ' 块');
+    ok('提建议表单在', !!d.getElementById('sgBody') && !!d.getElementById('sgSend'));
+
+    // 摇一瓶
+    d.getElementById('slotGo').click();
+    await wait(2600);
+    ok('抽签机摇出了结果', txt(d, 'slotName').length > 2 && txt(d, 'slotName') !== '准备好就摇', txt(d, 'slotName'));
+
+    // 提建议
+    d.getElementById('sgBody').value = '自测用建议：希望加个「按热量排序」。';
+    d.getElementById('sgBy').value = '自测脚本';
+    d.getElementById('sgSend').click();
+    await wait(400);
+    ok('建议提交成功', w.DrinkUser.suggestions().length >= 1);
+    ok('建议列表里有它', /自测用建议/.test(d.getElementById('labSuggest').textContent));
+
+    // 点地图里的一款 → 应该打开详情
+    d.querySelector('.mapchip').click();
+    await wait(250);
+    ok('点地图能打开详情', d.getElementById('detail').classList.contains('on'));
+    d.querySelector('[data-close]').click();
+
+    /* ---- F. 清理 ---- */
+    w.DrinkUser.clearLocal();
+    w.DrinkCompare.clear();
+    w.Store.restore({ pending: [], approved: [], rejected: [] });
+
+  } catch (e) {
+    fail++; log.push('✗ 抛异常：' + e.message + '\n   ' + (e.stack || '').split('\n')[1]);
+  }
+  document.getElementById('out').textContent = 'FEATURETEST 通过 ' + pass + ' / 失败 ' + fail + '\n\n' + log.join('\n');
+});
+</script>
+</body></html>

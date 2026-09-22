@@ -14,6 +14,11 @@
   var active = {};        // { 行key: { 序号: 0|1|2 } }
   var sortKey = 'default';
   var keyword = '';
+  var activePreset = null;   // 当前选中的场景预设 id
+  var lastDrawnId = null;    // 最近抽签抽中的那款
+  var view = 'browse';       // browse | compare | lab
+  var labInited = {};
+  var pendingView = null;    // 从网址里读到的视图，等 boot 完再切
 
   var OFF = 0, WANT = 1, NOPE = 2;
 
@@ -161,7 +166,11 @@
     if (s) for (var i in s) { if (s[i] === WANT) inc.push(+i); else if (s[i] === NOPE) exc.push(+i); }
     return { inc: inc, exc: exc, n: inc.length + exc.length };
   }
-  function activeCount() { var n = 0; ROWS.forEach(function (r) { n += pickedOf(r.key).n; }); return n; }
+  function activeCount() {
+    var n = 0;
+    ROWS.forEach(function (r) { n += pickedOf(r.key).n; });
+    return n + (activePreset ? 1 : 0);
+  }
   function anyFilter() { return activeCount() > 0; }
   function isFlow() { return !anyFilter() && !keyword && sortKey === 'default'; }
 
@@ -180,8 +189,10 @@
   }
 
   function results() {
+    var preset = activePreset ? window.DrinkPresets.byId(activePreset) : null;
     return ALL.filter(function (b) {
       if (keyword && !hitKeyword(b)) return false;
+      if (preset && !preset.test(b)) return false;
       for (var i = 0; i < ROWS.length; i++) if (!matchRow(b, ROWS[i])) return false;
       return true;
     }).sort(cmp);
@@ -281,10 +292,17 @@
     });
     var el = $('#summary');
     if (!el) return;
-    el.innerHTML = out.map(function (x) {
+    // 预设也算一个已选条件，显示在摘要条最前面
+    var preset = activePreset ? window.DrinkPresets.byId(activePreset) : null;
+    var head = preset
+      ? '<button class="sm inc preset" type="button" data-clear-preset="1">预设：' + esc(preset.name) + ' ✕</button>'
+      : '';
+    el.innerHTML = head + out.map(function (x) {
       return '<button class="sm ' + (x.no ? 'exc' : 'inc') + '" type="button" data-k="' + x.k + '" data-i="' + x.i + '">'
         + (x.no ? '不要 ' : '') + esc(x.t) + ' ✕</button>';
     }).join('');
+    var dh = $('#drawHint');
+    if (dh) dh.textContent = (activePreset || anyFilter() || keyword) ? '' : '（没筛，就从全部里抽）';
   }
 
   /* ============================ 筛选面板 ============================ */
@@ -297,11 +315,20 @@
         }).join('') + '</div></div>';
     }).join('');
 
-    html += '<div class="frow quick"><div class="fk">偷懒</div><div class="fv">'
-      + '<button class="chip" type="button" id="qOk">糖少、没气</button>'
-      + '<button class="chip" type="button" id="qZero">零糖还不带咖啡因</button>'
-      + '<button class="chip" type="button" id="qIce">冰过更好喝</button>'
+    // 场景预设：不是属性，是「什么时候喝」，点一下自动配好条件
+    var presets = window.DrinkPresets.list;
+    html += '<div class="frow presetsrow"><div class="fk">预设</div><div class="fv">'
+      + presets.map(function (p) {
+        return '<button class="chip preset" type="button" data-preset="' + p.id + '"'
+          + ' aria-pressed="false" title="' + esc(p.hint) + '">' + esc(p.name) + '</button>';
+      }).join('')
       + '<button class="chip" type="button" id="qClear">全清掉</button>'
+      + '</div></div>';
+
+    // 随机抽签放在最后
+    html += '<div class="frow drawrow"><div class="fk">抽签</div><div class="fv">'
+      + '<button class="chip draw" type="button" id="drawBtn">从筛出来的里面抽一瓶</button>'
+      + '<span class="fhint" id="drawHint" style="align-self:center"></span>'
       + '</div></div>';
 
     $('#filterRows').innerHTML = html;
@@ -310,6 +337,11 @@
   function syncChips() {
     document.querySelectorAll('.chip[data-k]').forEach(function (c) {
       c.setAttribute('data-st', String(stateOf(c.dataset.k, +c.dataset.i)));
+    });
+    document.querySelectorAll('.chip[data-preset]').forEach(function (c) {
+      var on = c.dataset.preset === activePreset;
+      c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      c.setAttribute('data-st', on ? '1' : '0');
     });
   }
 
@@ -343,14 +375,52 @@
     r('备注', esc(b.note));
     if (b.fromUser) r('来源', '网友提交，已收录');
 
+    var cubes = window.DrinkPresets.sugarCubes(b);
+    if (cubes > 0) {
+      r('一瓶 =', '<b style="font-size:17px">' + cubes + ' 块方糖</b>　<span class="sub">'
+        + window.DrinkPresets.sugarGrams(b) + ' g 糖 / 整瓶 ' + b.ml + 'ml</span>');
+    }
+    var place = window.DrinkPresets.origin(b);
+    if (place) r('产地', place.province + ' ' + place.city);
+
+    var liked = window.DrinkUser.liked(b.id);
+    var likeN = window.DrinkUser.likeCount(b.id);
+    var cmts = window.DrinkUser.visibleComments(b.id);
+    var inCmp = window.DrinkCompare.ids().indexOf(b.id) >= 0;
+
+    $('#detailTitle').textContent = b.n;
     $('#detailBody').innerHTML = '<div class="head">'
       + '<div>' + window.drinkArt(b, 96) + '</div>'
       + '<div style="flex:1;min-width:0">'
       + '<h2>' + esc(b.n) + '</h2>'
       + '<div class="sub">' + esc(b.b) + ' · ' + esc(b.c) + (b.en ? ' · ' + esc(b.en) : '') + '</div>'
       + '<div class="sub" style="margin-top:6px">' + esc(b.brief) + '</div>'
+      + '<div class="dacts">'
+      + '  <button class="likebtn' + (liked ? ' on' : '') + '" type="button" data-like="' + b.id + '">'
+      + '    <span class="heart">' + (liked ? '♥' : '♡') + '</span> <b data-like-n="' + b.id + '">' + likeN + '</b> 人点了'
+      + '  </button>'
+      + '  <button class="tb" type="button" data-addcmp="' + b.id + '">' + (inCmp ? '已在对比里' : '加入对比') + '</button>'
+      + '</div>'
       + '</div></div>'
-      + '<dl>' + rows.join('') + '</dl>';
+      + '<dl>' + rows.join('') + '</dl>'
+      + '<div class="cmtbox">'
+      + '  <div class="cmthead">评论 <b>' + cmts.length + '</b> 条'
+      + '    <span class="sub">' + window.DrinkUser.modeName() + '</span></div>'
+      + '  <div class="cmtlist">'
+      + (cmts.length ? cmts.map(function (c) {
+        return '<div class="cmtitem"><div class="cmtmeta">' + esc(c.by) + ' · '
+          + String(c.at || '').replace('T', ' ').slice(0, 16) + '</div>'
+          + '<div class="cmtbody">' + esc(c.body) + '</div></div>';
+      }).join('') : '<p class="sub" style="margin:6px 0">还没人说。你来说第一句？</p>')
+      + '  </div>'
+      + '  <div class="cmtform">'
+      + '    <textarea data-cmt-body="' + b.id + '" rows="2" placeholder="喝过之后什么感觉？"></textarea>'
+      + '    <input data-cmt-by="' + b.id + '" placeholder="怎么称呼（可留空）" maxlength="20">'
+      + '    <button class="tb fill" type="button" data-cmt-send="' + b.id + '">发评论</button>'
+      + '  </div>'
+      + (window.DrinkUser.online ? '' : '<p class="fhint">现在是本地模式：点赞和评论只存在你这台设备上，'
+        + '别人看不到。配上后端（见 worker/ 目录）就会变成大家共用的数据。</p>')
+      + '</div>';
     $('#detail').classList.add('on');
     document.body.style.overflow = 'hidden';
   }
@@ -420,6 +490,9 @@
     }
     if (q.sort && SORTS.some(function (s) { return s[0] === q.sort; })) sortKey = q.sort;
     if (q.q) keyword = q.q.toLowerCase();
+    if (q.preset && window.DrinkPresets.byId(q.preset)) activePreset = q.preset;
+    if (q.view && ['browse', 'compare', 'lab'].indexOf(q.view) >= 0) pendingView = q.view;
+    if (q.cmp) window.DrinkCompare.set(String(q.cmp).split(','));
     var sb = $('#search'); if (sb && q.q) sb.value = q.q;
     var so = $('#sort'); if (so) so.value = sortKey;
   }
@@ -435,6 +508,8 @@
     if (f.length) parts.push('f=' + encodeURIComponent(f.join(',')));
     if (sortKey !== 'default') parts.push('sort=' + sortKey);
     if (keyword) parts.push('q=' + encodeURIComponent(keyword));
+    if (activePreset) parts.push('preset=' + activePreset);
+    if (view !== 'browse') parts.push('view=' + view);
     var h = parts.length ? '#' + parts.join('&') : '#';
     if (location.hash !== h) { try { history.replaceState(null, '', h); } catch (e) { location.hash = h; } }
   }
@@ -446,20 +521,154 @@
     syncChips(); render();
   }
 
-  function applyQuick(pairs) {
-    active = {}; keyword = ''; sortKey = 'default';
-    var sb = $('#search'); if (sb) sb.value = '';
-    var so = $('#sort'); if (so) so.value = 'default';
-    pairs.forEach(function (p) { if (p[1] !== undefined) sel(p[0])[p[1]] = WANT; });
+  /** 点预设：配好条件。再点一次取消 */
+  function togglePreset(id) {
+    activePreset = (activePreset === id) ? null : id;
+    var p = activePreset ? window.DrinkPresets.byId(activePreset) : null;
     syncChips(); render();
+    if (p) toast('预设：' + p.name + '　' + p.hint);
   }
 
   function clearAll(say) {
-    active = {}; keyword = ''; sortKey = 'default';
+    active = {}; keyword = ''; sortKey = 'default'; activePreset = null; lastDrawnId = null;
     var sb = $('#search'); if (sb) sb.value = '';
     var so = $('#sort'); if (so) so.value = 'default';
+    var db = $('#drawBox'); if (db) db.style.display = 'none';
     syncChips(); render();
     if (say !== false) toast('条件都清掉了');
+  }
+
+  /* ============================ 随机抽签 ============================ */
+  var drawTimer = null;
+  function doDraw() {
+    var list = results();
+    var box = $('#drawBox'), btn = $('#drawBtn');
+    if (!box) return;
+    if (!list.length) { toast('筛出来是空的，先松一松条件'); return; }
+
+    if (drawTimer) clearInterval(drawTimer);
+    box.style.display = '';
+    btn.disabled = true;
+
+    var final = list[Math.floor(Math.random() * list.length)];
+    var ticks = 0, total = 16 + Math.floor(Math.random() * 8);
+
+    box.innerHTML = '<div class="drawcard rolling"><div class="drawlabel">正在抽…</div>'
+      + '<div class="drawname" id="drawName">…</div></div>';
+
+    drawTimer = setInterval(function () {
+      ticks++;
+      var r = list[Math.floor(Math.random() * list.length)];
+      var nEl = $('#drawName');
+      if (nEl) nEl.textContent = r.n;
+      if (ticks < total) return;
+
+      clearInterval(drawTimer); drawTimer = null;
+      btn.disabled = false;
+      lastDrawnId = final.id;
+      box.innerHTML = '<div class="drawcard landed">'
+        + '<div class="drawart">' + window.drinkArt(final, 84) + '</div>'
+        + '<div class="drawinfo">'
+        + '<div class="drawlabel">抽到了</div>'
+        + '<div class="drawname">' + esc(final.n) + '</div>'
+        + '<div class="drawsub">' + esc(final.b) + ' · ' + esc(final.c) + ' · ' + esc(final.brief) + '</div>'
+        + '<div class="drawacts">'
+        + '<button class="tb fill" type="button" data-draw-locate="' + final.id + '">在下面找到它</button>'
+        + '<button class="tb" type="button" data-draw-open="' + final.id + '">看详情</button>'
+        + '<button class="tb" type="button" data-draw-again="1">再抽一次</button>'
+        + '</div></div></div>';
+
+      // 同步在网格里高亮
+      render();
+      jumpTo(final.id);
+    }, 65);
+  }
+
+  /** 在列表里把某款高亮并滚过去 */
+  function jumpTo(id) {
+    var el = document.querySelector('.card[data-id="' + id + '"]');
+    if (!el) return;
+    document.querySelectorAll('.card.drawn').forEach(function (c) { c.classList.remove('drawn'); });
+    el.classList.add('drawn');
+    try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { el.scrollIntoView(); }
+  }
+
+  /* ============================ 视图切换 ============================ */
+  function switchView(v) {
+    view = v;
+    ['browse', 'compare', 'lab'].forEach(function (k) {
+      var el = document.getElementById('view-' + k);
+      if (el) el.style.display = (k === v) ? '' : 'none';
+    });
+    document.querySelectorAll('.vt').forEach(function (b) {
+      b.setAttribute('aria-selected', b.dataset.view === v ? 'true' : 'false');
+    });
+    try { sessionStorage.setItem('drinkdb.view', v); } catch (e) {}
+    if (v === 'compare') renderCompare();
+    if (v === 'lab') initLab();
+    window.scrollTo(0, 0);
+  }
+
+  /* ============================ 对比 ============================ */
+  function renderCompare() {
+    var host = $('#cmpHost');
+    if (!host) return;
+    window.DrinkCompare.render(host, ALL);
+
+    // 已选小标签
+    var picked = $('#cmpPicked');
+    var ids = window.DrinkCompare.ids();
+    picked.innerHTML = ids.map(function (id) {
+      var b = ALL.filter(function (x) { return x.id === id; })[0];
+      if (!b) return '';
+      return '<span class="cmp-pill">' + esc(b.n)
+        + '<button type="button" data-cmp-remove="' + id + '" title="移出">✕</button></span>';
+    }).join('') || '<span class="sub">还没选（最多 3 款）</span>';
+  }
+
+  function cmpSearch(kw) {
+    var host = $('#cmpHits');
+    kw = (kw || '').trim().toLowerCase();
+    if (!kw) { host.innerHTML = ''; return; }
+    var hits = ALL.filter(function (b) {
+      return (b.n + ' ' + b.b + ' ' + b.c).toLowerCase().indexOf(kw) >= 0;
+    }).slice(0, 8);
+    host.innerHTML = hits.length ? hits.map(function (b) {
+      var on = window.DrinkCompare.ids().indexOf(b.id) >= 0;
+      return '<button class="cmp-hit' + (on ? ' on' : '') + '" type="button" data-cmp-add="' + b.id + '">'
+        + esc(b.n) + '<em>' + esc(b.b) + '</em></button>';
+    }).join('') : '<span class="sub">没找到</span>';
+  }
+
+  /* ============================ 创新区 ============================ */
+  var labSlotApi = null;
+  function initLab() {
+    if (!labInited.slot) {
+      labInited.slot = true;
+      labSlotApi = window.DrinkLab.slot($('#labSlot'), ALL, {
+        poolFn: function () { return results(); },
+        onPick: function (b) {
+          lastDrawnId = b.id;
+          $('#labSlot').querySelector('.slot-name').textContent = b.n;
+        },
+      });
+    } else if (labSlotApi) {
+      labSlotApi.updateCount();
+    }
+    if (!labInited.map) {
+      labInited.map = true;
+      window.DrinkLab.map($('#labMap'), ALL, openDetail);
+    }
+    if (!labInited.cubes) {
+      labInited.cubes = true;
+      window.DrinkLab.cubes($('#labCubes'), ALL, openDetail);
+    }
+    if (!labInited.suggest) {
+      labInited.suggest = true;
+      window.DrinkLab.suggest($('#labSuggest'), function () {
+        $('#statMode').textContent = window.DrinkUser.modeName();
+      });
+    }
   }
 
   var toastTimer;
@@ -472,14 +681,13 @@
 
   /* ============================ 绑定 ============================ */
   function bind() {
-    // 筛选按钮三态
+    // 筛选按钮三态 + 预设 + 抽签
     $('#filterRows').addEventListener('click', function (e) {
       var c = e.target.closest('.chip');
       if (!c) return;
-      if (c.id === 'qOk') return applyQuick([['carb', 0], ['sugar', 0], ['sugar', 1]]);
-      if (c.id === 'qZero') return applyQuick([['sugar', 0], ['cf', 0]]);
-      if (c.id === 'qIce') return applyQuick([['ice', 0]]);
       if (c.id === 'qClear') return clearAll();
+      if (c.id === 'drawBtn') return doDraw();
+      if (c.dataset.preset) return togglePreset(c.dataset.preset);
       if (c.dataset.k !== undefined) cycle(c.dataset.k, +c.dataset.i);
     });
 
@@ -487,8 +695,90 @@
     on('#summary', 'click', function (e) {
       var b = e.target.closest('.sm');
       if (!b) return;
+      if (b.dataset.clearPreset) { activePreset = null; syncChips(); render(); return; }
       var s = sel(b.dataset.k); s[b.dataset.i] = OFF;
       syncChips(); render();
+    });
+
+    // 抽签结果上的按钮
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      if (t.dataset && t.dataset.drawAgain) return doDraw();
+      if (t.dataset && t.dataset.drawLocate) return jumpTo(t.dataset.drawLocate);
+      if (t.dataset && t.dataset.drawOpen) return openDetail(t.dataset.drawOpen);
+    });
+
+    // 视图切换
+    document.querySelectorAll('.vt').forEach(function (b) {
+      b.addEventListener('click', function () { switchView(b.dataset.view); });
+    });
+
+    // 对比区
+    on('#cmpSearch', 'input', function (e) { cmpSearch(e.target.value); });
+    on('#cmpClear', 'click', function () { window.DrinkCompare.clear(); renderCompare(); cmpSearch($('#cmpSearch').value); });
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      var add = t.closest && t.closest('[data-cmp-add]');
+      if (add) {
+        window.DrinkCompare.add(add.dataset.cmpAdd);
+        renderCompare(); cmpSearch($('#cmpSearch').value);
+        return;
+      }
+      var rm = t.closest && t.closest('[data-cmp-remove]');
+      if (rm) {
+        window.DrinkCompare.remove(rm.dataset.cmpRemove);
+        renderCompare(); cmpSearch($('#cmpSearch').value);
+        return;
+      }
+      var set = t.closest && t.closest('[data-cmp-set]');
+      if (set) {
+        window.DrinkCompare.set(set.dataset.cmpSet.split(','));
+        renderCompare();
+        return;
+      }
+      var ac = t.closest && t.closest('[data-addcmp]');
+      if (ac) {
+        var id = ac.dataset.addcmp;
+        if (window.DrinkCompare.ids().indexOf(id) >= 0) {
+          window.DrinkCompare.remove(id);
+          ac.textContent = '加入对比';
+        } else {
+          window.DrinkCompare.add(id);
+          ac.textContent = '已在对比里';
+          toast('加进对比了，切到「对比」看');
+        }
+        return;
+      }
+    });
+
+    // 点赞
+    document.addEventListener('click', function (e) {
+      var lb = e.target.closest && e.target.closest('[data-like]');
+      if (!lb) return;
+      var id = lb.dataset.like;
+      var res = window.DrinkUser.toggleLike(id);
+      lb.classList.toggle('on', res.on);
+      lb.querySelector('.heart').textContent = res.on ? '♥' : '♡';
+      var n = lb.querySelector('[data-like-n]');
+      if (n) n.textContent = res.n;
+    });
+
+    // 发评论
+    document.addEventListener('click', function (e) {
+      var sb = e.target.closest && e.target.closest('[data-cmt-send]');
+      if (!sb) return;
+      var id = sb.dataset.cmtSend;
+      var bodyEl = document.querySelector('[data-cmt-body="' + id + '"]');
+      var byEl = document.querySelector('[data-cmt-by="' + id + '"]');
+      sb.disabled = true;
+      window.DrinkUser.addComment(id, bodyEl.value, byEl.value).then(function () {
+        sb.disabled = false;
+        toast(window.DrinkUser.online ? '发出去了，等整理者放行' : '记下了（仅本机可见）');
+        openDetail(id);
+      }).catch(function (err) {
+        sb.disabled = false;
+        toast(err.message || '没发出去');
+      });
     });
 
     // 卡片 / 关闭
@@ -588,8 +878,10 @@
     set('#statApproved', st.approved);
     set('#statCats', window.BEV_CATS.length);
     set('#statStorage', st.storage);
-    var fa = $('#footAuthor');
-    if (fa) fa.textContent = CFG.author ? CFG.author + ' ' + (CFG.authorRole || '') : '';
+    ['#footAuthor', '#footAuthor2', '#footAuthor3'].forEach(function (sel3) {
+      var e = $(sel3);
+      if (e) e.textContent = CFG.author ? CFG.author + ' ' + (CFG.authorRole || '') : '';
+    });
     var sig = document.querySelector('.logo .sig');
     if (sig) sig.textContent = ('by ' + (CFG.author || '')).trim();
     document.title = CFG.siteName + ' ' + CFG.siteNameEn + ' · ' + CFG.tagline;
@@ -597,10 +889,23 @@
     buildFilters();
     buildForm();
     bind();
+    window.DrinkCompare.restore();
     readHash();
     syncChips();
     if (!window.Store.canLS) $('#lsWarn').style.display = '';
+
+    // 互动数据：线上模式先拉一次；本地模式直接标出来
+    set('#statMode', window.DrinkUser.modeName());
+    window.DrinkUser.load().then(function () {
+      set('#statMode', window.DrinkUser.modeName());
+    });
+
     render();
+
+    // 记住上次在哪个视图（网址里指定的优先）
+    var v = pendingView;
+    if (!v) { try { v = sessionStorage.getItem('drinkdb.view'); } catch (e) {} }
+    if (v && v !== 'browse') switchView(v);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

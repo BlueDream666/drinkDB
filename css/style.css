@@ -282,6 +282,216 @@ button, input, select, textarea { font: inherit; color: inherit; }
 fieldset { border: 1px solid var(--rule); border-radius: var(--r); padding: 13px 14px 15px; margin: 0 0 14px; }
 legend { font-size: 12.5px; color: var(--muted); padding: 0 6px; }
 
+/* ================= 顶部视图切换 ================= */
+.viewtabs { display: flex; gap: 4px; margin-left: 14px; flex: 0 0 auto; }
+.vt {
+  border: 1px solid transparent; background: transparent; color: var(--muted);
+  font-size: 13px; padding: 4px 11px; border-radius: var(--r); cursor: pointer; white-space: nowrap;
+}
+.vt:hover { color: var(--text); }
+.vt[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (max-width: 600px) {
+  .viewtabs { margin-left: 3px; }
+  .vt { font-size: 12px; padding: 4px 8px; }
+}
+
+/* ================= 预设 / 抽签 ================= */
+.presetsrow .chip.preset { border-color: var(--rule); }
+.presetsrow .chip.preset[data-st="1"] { background: var(--good); border-color: var(--good); color: #fff; }
+.chip.draw { border-color: var(--accent); color: var(--accent); }
+.chip.draw:hover { background: var(--accent); color: #fff; }
+.sm.preset { font-weight: 600; }
+
+/* 抽签结果条 */
+.drawbox { margin: 14px 0 4px; }
+.drawcard {
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  border: 1px solid var(--accent); border-left-width: 4px; border-radius: var(--r);
+  background: var(--panel); padding: 14px 16px;
+}
+.drawcard.rolling { justify-content: center; text-align: center; border-color: var(--rule); }
+.drawcard.landed { animation: drawIn .45s ease-out; }
+@keyframes drawIn {
+  0% { transform: scale(.96); opacity: .4; }
+  60% { transform: scale(1.015); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.drawart { flex: 0 0 auto; }
+.drawinfo { flex: 1 1 240px; min-width: 0; }
+.drawlabel { font-size: 11.5px; color: var(--faint); letter-spacing: .06em; }
+.drawname { font-family: var(--serif); font-size: 22px; line-height: 1.25; }
+.drawsub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.drawacts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+/* 抽中的那张卡在列表里高亮 */
+.card.drawn {
+  border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft);
+  animation: drawPulse 1.1s ease-out 2;
+}
+@keyframes drawPulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--accent-soft); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawcard.landed, .card.drawn { animation: none; }
+}
+
+/* ================= 详情里的点赞 / 评论 ================= */
+.dacts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.likebtn {
+  border: 1px solid var(--rule); background: var(--panel); color: var(--muted);
+  border-radius: 999px; padding: 0 14px; height: 34px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; font-size: 13px;
+}
+.likebtn .heart { font-size: 15px; line-height: 1; }
+.likebtn:hover { border-color: var(--bad); color: var(--bad); }
+.likebtn.on { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
+.likebtn b { font-weight: 600; }
+.cmtbox { margin-top: 22px; border-top: 1px solid var(--rule); padding-top: 16px; }
+.cmthead { font-size: 14px; margin-bottom: 10px; }
+.cmthead .sub { margin-left: 8px; font-size: 11.5px; }
+.cmtlist { display: flex; flex-direction: column; gap: 10px; }
+.cmtitem { border-left: 2px solid var(--grid); padding-left: 11px; }
+.cmtmeta { font-size: 11.5px; color: var(--faint); }
+.cmtbody { font-size: 14px; }
+.cmtform { display: grid; gap: 8px; margin-top: 14px; grid-template-columns: 1fr 150px; }
+.cmtform textarea {
+  grid-column: 1 / -1; border: 1px solid var(--rule); background: var(--panel);
+  border-radius: var(--r); padding: 9px 11px; resize: vertical; font: inherit;
+}
+.cmtform input, .cmtform button {
+  border: 1px solid var(--rule); background: var(--panel); border-radius: var(--r);
+  padding: 8px 11px; min-height: 36px;
+}
+.cmtform button { background: var(--accent); border-color: var(--accent); color: #fff; cursor: pointer; }
+@media (max-width: 560px) { .cmtform { grid-template-columns: 1fr; } }
+
+/* ================= 对比 ================= */
+.lab { margin: 22px 0 34px; }
+.lab h2 { font-size: 22px; margin-bottom: 4px; }
+.lab .lead { color: var(--muted); font-size: 14px; margin: 0 0 14px; max-width: 76ch; }
+.lab-sub { font-size: 14px; color: var(--muted); margin: 18px 0 8px; font-weight: 400; }
+
+.cmp-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cmp-bar .search { flex: 1 1 240px; }
+.cmp-picked { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.cmp-pill {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
+  border: 1px solid var(--accent); color: var(--accent); border-radius: 999px; padding: 3px 6px 3px 11px;
+}
+.cmp-pill button { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 12px; padding: 0 3px; }
+.cmp-hits { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; min-height: 1px; }
+.cmp-hit {
+  border: 1px solid var(--rule); background: var(--panel); border-radius: var(--r);
+  padding: 6px 11px; cursor: pointer; text-align: left; font-size: 13px; color: var(--text);
+}
+.cmp-hit em { display: block; font-style: normal; font-size: 11px; color: var(--faint); }
+.cmp-hit:hover { border-color: var(--muted); }
+.cmp-hit.on { border-color: var(--accent); background: var(--accent-soft); }
+.cmp-host { margin-top: 18px; }
+.cmp-empty { border: 1px dashed var(--rule); border-radius: var(--r); padding: 26px 18px; text-align: center; color: var(--muted); }
+.cmp-suggest { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 14px; }
+.cmp-table { width: 100%; border-collapse: collapse; }
+.cmp-table th, .cmp-table td { text-align: left; padding: 9px 12px; vertical-align: top; }
+.cmp-table .cmp-rowhead {
+  font-family: var(--sans); font-size: 12px; font-weight: 400; color: var(--muted);
+  white-space: nowrap; width: 150px; border-right: 1px solid var(--grid);
+}
+.cmp-table tbody tr { border-top: 1px solid var(--grid); }
+.cmp-table tbody tr:nth-child(odd) { background: color-mix(in srgb, var(--sunk) 45%, transparent); }
+.cmp-col { vertical-align: bottom; }
+.cmp-card { position: relative; }
+.cmp-x {
+  position: absolute; right: 0; top: 0; border: 0; background: transparent;
+  color: var(--faint); cursor: pointer; font-size: 13px; padding: 2px 5px;
+}
+.cmp-x:hover { color: var(--bad); }
+.cmp-art { display: flex; justify-content: center; background: #fff; border-radius: 3px; padding: 4px; }
+@media (prefers-color-scheme: dark) { .cmp-art { background: #f6f6f0; } }
+.cmp-name { font-size: 14px; font-weight: 600; margin-top: 6px; line-height: 1.3; }
+.cmp-brand { font-size: 11.5px; color: var(--faint); }
+.cmp-cell.best { background: var(--accent-soft); font-weight: 600; }
+.cmp-table .stars i { font-size: 12px; }
+@media (max-width: 700px) {
+  .cmp-table .cmp-rowhead { width: 88px; font-size: 11px; padding: 7px 8px; }
+  .cmp-table th, .cmp-table td { padding: 7px 8px; font-size: 13px; }
+  .cmp-table { display: block; overflow-x: auto; white-space: nowrap; }
+}
+
+/* ================= 创新区：抽签机 ================= */
+.slot {
+  border: 1px solid var(--rule); border-radius: var(--r); background: var(--panel);
+  padding: 26px 20px; text-align: center;
+}
+.slot.spinning { border-color: var(--accent); }
+.slot.landed { animation: drawIn .45s ease-out; }
+.slot-window { overflow: hidden; }
+.slot-name {
+  display: block; font-family: var(--serif); font-size: clamp(24px, 5vw, 40px); line-height: 1.3;
+  min-height: 1.3em;
+}
+.slot.spinning .slot-name { opacity: .75; filter: blur(.3px); }
+.slot-sub { color: var(--muted); font-size: 13.5px; margin-top: 8px; min-height: 1.5em; }
+.slot-acts { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+.slot-acts .tb { height: 38px; padding: 0 20px; }
+
+/* ================= 创新区：汽水地图 ================= */
+.mapwrap { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.mapregion { border: 1px solid var(--rule); border-radius: var(--r); background: var(--panel); padding: 12px 14px; }
+.mapregion h3 {
+  font-size: 15px; margin: 0 0 10px; padding-bottom: 7px; border-bottom: 1px solid var(--grid);
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.mapregion h3 em { font-style: normal; font-size: 11.5px; color: var(--faint); font-family: var(--sans); }
+.mapprov { display: flex; gap: 9px; padding: 5px 0; align-items: flex-start; }
+.provname {
+  flex: 0 0 52px; font-size: 11.5px; color: var(--faint); text-align: right; padding-top: 5px;
+}
+.provlist { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.mapchip {
+  border: 1px solid var(--rule); background: var(--bg); border-radius: var(--r);
+  padding: 4px 9px; cursor: pointer; font-size: 12.5px; color: var(--text); text-align: left;
+}
+.mapchip em { display: block; font-style: normal; font-size: 10.5px; color: var(--faint); }
+.mapchip:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ================= 创新区：方糖 ================= */
+.cubelist { display: flex; flex-direction: column; gap: 2px; }
+.cuberow {
+  display: grid; grid-template-columns: minmax(120px, 200px) 1fr 110px;
+  gap: 14px; align-items: center; padding: 7px 8px; border-radius: var(--r); cursor: pointer;
+  border-bottom: 1px solid var(--grid);
+}
+.cuberow:hover { background: var(--sunk); }
+.cubename { font-size: 13.5px; font-weight: 600; }
+.cubename em { display: block; font-style: normal; font-weight: 400; font-size: 11px; color: var(--faint); }
+.cubes { display: flex; gap: 3px; flex-wrap: wrap; align-items: center; }
+.cube {
+  width: 13px; height: 13px; border-radius: 2px; background: #e8dcc8;
+  border: 1px solid #cbbba0; display: inline-block;
+}
+.cube.half { background: linear-gradient(90deg, #e8dcc8 50%, transparent 50%); }
+@media (prefers-color-scheme: dark) {
+  .cube { background: #5a5347; border-color: #7a7364; }
+  .cube.half { background: linear-gradient(90deg, #5a5347 50%, transparent 50%); }
+}
+.cube-more { font-size: 11px; color: var(--faint); margin-left: 3px; }
+.cubenum { text-align: right; font-size: 12px; color: var(--muted); }
+.cubenum b { font-size: 19px; color: var(--text); font-family: var(--serif); font-weight: 400; }
+.cubenum em { display: block; font-style: normal; font-size: 11px; color: var(--faint); }
+@media (max-width: 640px) {
+  .cuberow { grid-template-columns: 1fr auto; grid-template-areas: "n n" "c c"; gap: 6px 10px; }
+  .cubename { grid-area: n; }
+  .cubes { grid-area: c; }
+  .cubenum { grid-area: n; justify-self: end; }
+}
+
+/* ================= 创新区：建议 ================= */
+.sglist { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+.sgitem { border-left: 2px solid var(--grid); padding-left: 11px; }
+.sgtop { font-size: 11.5px; color: var(--faint); display: flex; gap: 8px; align-items: center; }
+.sgtext { font-size: 14px; }
+
 /* ================= 后台 ================= */
 .queue { display: flex; flex-direction: column; gap: 11px; }
 .item { border: 1px solid var(--rule); background: var(--panel); border-radius: var(--r); padding: 13px 14px; }

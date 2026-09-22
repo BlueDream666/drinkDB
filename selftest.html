@@ -113,11 +113,11 @@ document.getElementById('f').addEventListener('load', async function () {
     ok('点摘要能去掉它', d.querySelectorAll('#summary .sm').length === 0);
     d.getElementById('qClear').click();
 
-    /* ============ G. 快捷 ============ */
-    d.getElementById('qOk').click();
+    /* ============ G. 预设 ============ */
+    d.querySelector('.chip[data-preset="clean"]').click();
     var q1 = cnt(txt(d, 'count'));
-    ok('快捷「糖少、没气」', q1 > 0 && q1 < 100, txt(d, 'count'));
-    ok('快捷后不是两排', d.getElementById('flowZone').style.display === 'none');
+    ok('预设「糖少、没气」', q1 > 0 && q1 < 100, txt(d, 'count'));
+    ok('应用预设后不是两排', d.getElementById('flowZone').style.display === 'none');
     d.getElementById('qClear').click();
     ok('清空后回到两排', d.getElementById('flowZone').style.display !== 'none');
 
