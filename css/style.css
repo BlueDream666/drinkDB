@@ -129,8 +129,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .tgl b:empty, .tgl b[data-n="0"] { display: none; }
 .tallyline { font-size: 11.5px; color: var(--faint); display: flex; gap: 8px; align-items: center; margin-top: 5px; flex-wrap: wrap; }
-.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); flex: 0 0 auto; }
-.dot.paused { background: var(--warn); }
 
 /* ================= 筛选面板 ================= */
 .filters { display: none; padding: 6px 0 8px; border-bottom: 1px solid var(--rule); }
@@ -172,27 +170,52 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .sm.inc { color: var(--accent); }
 .sm.exc { color: var(--bad); }
 
-/* ================= 流动区 ================= */
+/* ================= 两排横滑 =================
+   浏览器原生横向滚动：不动就完全静止，不占 CPU；惯性、边缘回弹
+   都是系统原生手感。上一版 JS 逐帧平移在卡片多的时候会卡成幻灯片。 */
 .flow { margin: 14px 0 4px; }
 .flowrow {
-  position: relative; overflow: hidden; padding: 6px 0;
-  touch-action: pan-y; cursor: grab;
-  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+  overflow-x: auto; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  padding: 8px 0 10px;
+  /* 右边渐隐，暗示还能往右划 */
+  mask-image: linear-gradient(90deg, #000 calc(100% - 56px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 56px), transparent);
 }
-.flowrow.grabbing { cursor: grabbing; }
-.flowtrack { display: flex; gap: 10px; width: max-content; }
+.flowrow::-webkit-scrollbar { height: 6px; }
+.flowrow::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 3px; }
+.flowrow::-webkit-scrollbar-track { background: transparent; }
+.flowtrack { display: flex; gap: 10px; width: max-content; padding-right: 60px; }
+/* 手机上让这两排通到屏幕两边，一眼就看得出能滑，而不是像被裁掉 */
+@media (max-width: 719px) {
+  .flow { margin-left: -14px; margin-right: -14px; }
+  .flowrow { padding-left: 14px; padding-right: 14px; }
+}
 .card {
-  flex: 0 0 auto; width: 138px; background: var(--panel);
+  flex: 0 0 auto; width: 154px; background: var(--panel);
   border: 1px solid var(--rule); border-radius: var(--r);
-  padding: 9px; display: flex; flex-direction: column; gap: 6px;
-  cursor: pointer; text-align: left;
+  padding: 10px; display: flex; flex-direction: column; gap: 7px;
+  cursor: pointer; text-align: left; scroll-snap-align: start;
 }
-@media (min-width: 560px) { .card { width: 162px; } }
-@media (min-width: 900px) { .card { width: 176px; } }
+.flowtrack .card { scroll-snap-align: start; }
+@media (min-width: 560px) { .card { width: 172px; } }
+@media (min-width: 900px) { .card { width: 186px; } }
 .card:active { border-color: var(--muted); background: var(--sunk); }
-.card .art { display: flex; justify-content: center; align-items: center; height: 92px; }
-@media (min-width: 560px) { .card .art { height: 110px; } }
+.card .art {
+  display: flex; justify-content: center; align-items: center;
+  height: 108px; background: #fff; border-radius: 3px;
+}
+@media (min-width: 560px) { .card .art { height: 122px; } }
+.card .nm { font-size: 13.5px; line-height: 1.35; font-weight: 600; min-height: 2.7em; }
+.card .br { font-size: 11.5px; color: var(--faint); }
+.card .rows { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--muted); }
+.card .rows .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.card .rows .k { color: var(--faint); flex: 0 0 auto; }
+.card .rows .v { text-align: right; }
+@media (prefers-color-scheme: dark) { .card .art { background: #f6f6f0; } }
 /* 真实产品图：统一按框内等比缩放，方图也不会被拉变形 */
 .art-img { object-fit: contain; max-width: 100%; max-height: 100%; display: block; }
 .card .nm { font-size: 13px; line-height: 1.35; font-weight: 600; min-height: 2.7em; }
@@ -211,9 +234,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .mk.caff { color: var(--accent); }
 
 /* ================= 网格 ================= */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 9px; margin: 14px 0 40px; }
-@media (min-width: 560px) { .grid { grid-template-columns: repeat(auto-fill, minmax(162px, 1fr)); gap: 11px; } }
-@media (min-width: 900px) { .grid { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 12px; } }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(154px, 1fr)); gap: 10px; margin: 14px 0 40px; }
+@media (min-width: 560px) { .grid { grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 11px; } }
+@media (min-width: 900px) { .grid { grid-template-columns: repeat(auto-fill, minmax(186px, 1fr)); gap: 12px; } }
 .grid .card { width: auto; }
 .nothing { padding: 48px 12px; text-align: center; color: var(--muted); font-size: 14px; }
 

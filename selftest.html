@@ -12,60 +12,54 @@ function ok(name, cond, extra) {
 function txt(d, id) { var e = d.getElementById(id); return e ? e.textContent.trim() : '(无 #' + id + ')'; }
 function cnt(s) { var m = String(s).match(/(\d+)/); return m ? (+m[1]) : null; }
 function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-function tf(d, id) { var t = d.querySelector('#flow' + id + ' .flowtrack'); return t ? t.style.transform : ''; }
-function px(s) { var m = String(s).match(/translate3d\((-?[\d.]+)px/); return m ? +m[1] : null; }
 
 document.getElementById('f').addEventListener('load', async function () {
   var w = this.contentWindow, d = this.contentDocument;
   try {
     /* ============ A. 默认状态 ============ */
     ok('默认显示全部 203 款', txt(d, 'count').indexOf('203') >= 0, txt(d, 'count'));
-    ok('默认是流动模式', d.getElementById('flowZone').style.display !== 'none' &&
+    ok('默认是两排模式', d.getElementById('flowZone').style.display !== 'none' &&
                         d.getElementById('gridZone').style.display === 'none');
     ok('两排都有卡片', d.querySelectorAll('#flowA .card').length > 0 && d.querySelectorAll('#flowB .card').length > 0,
        'A=' + d.querySelectorAll('#flowA .card').length + ' B=' + d.querySelectorAll('#flowB .card').length);
 
-    /* ============ B. 真的在动（不靠 CSS 动画） ============ */
+    /* ============ B. 两排是「手动横滑」，不再自动平移 ============ */
     await wait(300);
-    var M = w.__drinkdb.flow();
-    ok('两排都被驱动起来了', M.length === 2 && M[0].width() > 1000, '每排内容宽 ' + (M[0] ? Math.round(M[0].width()) : '?') + 'px');
+    var rowA = d.getElementById('flowA'), rowB = d.getElementById('flowB');
+    ok('两排内容都比容器宽（可横向滚动）',
+       rowA.scrollWidth > rowA.clientWidth + 100 && rowB.scrollWidth > rowB.clientWidth + 100,
+       'A ' + rowA.scrollWidth + '>' + rowA.clientWidth + '  B ' + rowB.scrollWidth + '>' + rowB.clientWidth);
+    ok('两排都不带 transform（没有自动平移）',
+       w.getComputedStyle(d.querySelector('#flowA .flowtrack')).transform === 'none',
+       w.getComputedStyle(d.querySelector('#flowA .flowtrack')).transform);
+    ok('没有 CSS 动画', w.getComputedStyle(d.querySelector('#flowA .flowtrack')).animationName === 'none');
 
-    var a1 = px(tf(d, 'A')), b1 = px(tf(d, 'B'));
-    w.__drinkdb.stepFlow(1000);          // 手动推进 1 秒，不受无头浏览器帧率影响
-    var a2 = px(tf(d, 'A')), b2 = px(tf(d, 'B'));
-    var speed = w.DRINKDB_CONFIG.flowSpeed;
-    ok('上排往左走，一秒走了 ' + speed + 'px', a2 < a1 && Math.abs((a1 - a2) - speed) < 2, a1 + ' → ' + a2);
-    ok('下排往右走，一秒走了 ' + speed + 'px', b2 > b1 && Math.abs((b2 - b1) - speed) < 2, b1 + ' → ' + b2);
-    ok('下排起点在左侧（约 -内容宽）', b1 < -1000, '起始 x=' + b1);
-    ok('没用 CSS 动画（改由 JS 驱动）',
-       w.getComputedStyle(d.querySelector('#flowA .flowtrack')).animationName === 'none');
+    var s0 = w.__drinkdb.scrollOf();
+    ok('初始滚动位置都在 0', s0[0] === 0 && s0[1] === 0, JSON.stringify(s0));
+    rowA.scrollLeft = 300;
+    await wait(400);
+    var pA = rowA.scrollLeft;
+    ok('上排能手动滑动', pA > 100, 'scrollLeft=' + pA);
+    await wait(700);
+    ok('滑完停在原地，不会自己跑', rowA.scrollLeft === pA, pA + ' → ' + rowA.scrollLeft);
 
-    /* ============ C. 暂停：位置不能跳回开头 ============ */
-    var before = px(tf(d, 'A'));
-    d.getElementById('flowToggle').click();
-    ok('点暂停不会跳回开头', Math.abs(px(tf(d, 'A')) - before) < 1.5,
-       before + ' → ' + px(tf(d, 'A')));
-    var p1 = px(tf(d, 'A'));
-    w.__drinkdb.stepFlow(1000);
-    ok('暂停期间推进也不动', px(tf(d, 'A')) === p1 && w.__drinkdb.isPaused(), p1 + ' → ' + px(tf(d, 'A')));
-    ok('暂停时按钮变成「继续」', d.getElementById('flowToggle').textContent.trim() === '继续',
-       d.getElementById('flowToggle').textContent.trim());
+    rowB.scrollLeft = 220;
+    await wait(400);
+    var pB = rowB.scrollLeft;
+    ok('下排能独立滑动', pB > 100 && pB !== pA, 'A=' + rowA.scrollLeft + ' B=' + pB);
+    await wait(700);
+    ok('下排也停住不动', rowB.scrollLeft === pB && rowA.scrollLeft === pA,
+       'A=' + rowA.scrollLeft + ' B=' + rowB.scrollLeft);
 
-    d.getElementById('flowToggle').click();
-    w.__drinkdb.stepFlow(1000);
-    ok('继续后从原地接着走', Math.abs((p1 - px(tf(d, 'A'))) - speed) < 2,
-       p1 + ' → ' + px(tf(d, 'A')) + '（应差 ' + speed + '）');
-
-    /* ============ C2. 指针进到轮播区就停住 ============ */
-    d.getElementById('flowZone').dispatchEvent(new w.PointerEvent('pointerenter', { bubbles: true }));
-    ok('指针进入轮播区 → 停住', w.__drinkdb.isHeld() === true);
-    var h1 = px(tf(d, 'A'));
-    w.__drinkdb.stepFlow(1000);
-    ok('停住期间推进不动', px(tf(d, 'A')) === h1, h1 + ' → ' + px(tf(d, 'A')));
-    d.getElementById('flowZone').dispatchEvent(new w.PointerEvent('pointerleave', { bubbles: true }));
-    ok('指针离开 → 恢复', w.__drinkdb.isHeld() === false);
-    w.__drinkdb.stepFlow(1000);
-    ok('恢复后接着走', Math.abs((h1 - px(tf(d, 'A'))) - speed) < 2, h1 + ' → ' + px(tf(d, 'A')));
+    /* ============ C. 重新渲染后滚动位置不丢 ============ */
+    d.getElementById('filterToggle').click();          // 打开筛选面板
+    d.querySelector('.chip[data-k="cf"][data-i="0"]').click();   // 加一个条件 → 变网格
+    d.getElementById('qClear').click();                // 清掉 → 回到两排
+    await wait(300);
+    var s1 = w.__drinkdb.scrollOf();
+    ok('切回两排后滚动位置还在', s1[0] === pA && s1[1] === pB,
+       JSON.stringify(s1) + '，应为 [' + pA + ',' + pB + ']');
+    rowA.scrollLeft = 0; rowB.scrollLeft = 0;
 
     /* ============ D. 三态筛选 ============ */
     var panel = d.getElementById('filterPanel');
@@ -122,9 +116,9 @@ document.getElementById('f').addEventListener('load', async function () {
     d.getElementById('qOk').click();
     var q1 = cnt(txt(d, 'count'));
     ok('快捷「糖少、没气」', q1 > 0 && q1 < 100, txt(d, 'count'));
-    ok('快捷后不是流动', d.getElementById('flowZone').style.display === 'none');
+    ok('快捷后不是两排', d.getElementById('flowZone').style.display === 'none');
     d.getElementById('qClear').click();
-    ok('清空后回到流动', d.getElementById('flowZone').style.display !== 'none');
+    ok('清空后回到两排', d.getElementById('flowZone').style.display !== 'none');
 
     /* ============ H. 搜索 / 排序 ============ */
     var sb = d.getElementById('search');

@@ -51,11 +51,9 @@
     <button class="tb" type="button" id="clearBtn" style="display:none">清空</button>
   </div>
   <div class="tallyline">
-    <span class="dot" id="flowDot"></span>
     <span id="count">—</span>
     <span>·</span>
-    <span id="modeTag">轮播中</span>
-    <button class="tb" type="button" id="flowToggle" style="height:24px;font-size:11.5px;padding:0 8px">暂停</button>
+    <span id="modeTag">左右划看</span>
   </div>
   <div class="summary" id="summary"></div>
 </div></div>
@@ -66,11 +64,11 @@
     <div id="filterRows"></div>
     <p class="fhint">
       <b>用法</b>　按钮三态：一次为「限定」，二次为「排除」，三次取消。同一行多选取并集，跨行取交集。<br>
-      <b>轮播</b>　未施加任何条件时自动轮播；指针进入轮播区即暂停，离开恢复。施加筛选、搜索或排序后转为静态排列。
+      <b>排列</b>　未施加任何条件时，两排可左右滑动；施加筛选、搜索或排序后转为整齐网格。
     </p>
   </div>
 
-  <!-- ================= 流动区 ================= -->
+  <!-- ================= 两排横滑 ================= -->
   <div class="flow" id="flowZone">
     <div class="flowrow" id="flowA"></div>
     <div class="flowrow" id="flowB"></div>

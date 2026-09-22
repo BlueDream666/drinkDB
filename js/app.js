@@ -14,10 +14,6 @@
   var active = {};        // { 行key: { 序号: 0|1|2 } }
   var sortKey = 'default';
   var keyword = '';
-  var flowPaused = false;      // 用户点了「暂停」
-  var flowHover = false;       // 鼠标 / 手指正在这两排上面
-  var marquees = [];
-  var flowBase = { flowA: 0, flowB: 0 };   // 记住每排飘到哪了，重建时不回零
 
   var OFF = 0, WANT = 1, NOPE = 2;
 
@@ -224,126 +220,26 @@
       + '</span></button>';
   }
 
-  /* ============================ 流动 ============================ */
-  function Marquee(rowEl, dir, startBase) {
-    var track = rowEl.querySelector('.flowtrack');
-    var width = 0, base = startBase || 0, dragX = 0;
-    var self = this;
-    this.row = rowEl;
-    this.id = rowEl.id;
-
-    this.measure = function () {
-      // 读 scrollWidth 会强制重排，所以这里拿到的宽度一定是准的
-      var w = track.scrollWidth;
-      if (w > 0) { width = w / 2; self.paint(); }
-    };
-    this.paint = function () {
-      if (!width) return;
-      var p = ((base % width) + width) % width;
-      // 往左走：位移从 0 到 -width；往右走：从 -width 回到 0。
-      // 两者 p 都是递增的，只是映射方式不同 —— 别去改 speed 的正负，
-      // 那样会把方向也一起反过来。
-      var x = dir < 0 ? -p : (p - width);
-      track.style.transform = 'translate3d(' + (x + dragX).toFixed(2) + 'px,0,0)';
-      flowBase[self.id] = base;
-    };
-    /** 推进 ms 毫秒（advance 调它；自测也能直接调，不依赖帧率） */
-    this.step = function (ms) {
-      base += (CFG.flowSpeed || 30) * ms / 1000;
-      self.paint();
-    };
-    this.setBase = function (v) { base = v || 0; self.paint(); };
-    this.width = function () { return width; };
-    this.offset = function () { var m = /translate3d\((-?[\d.]+)px/.exec(track.style.transform); return m ? +m[1] : null; };
-    this.at = function () { return base; };
-
-    function stopped() { return flowPaused || flowHover || dragX || document.hidden; }
-
-    var lastTick = 0;
-    function now() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
-
-    /** 唯一的推进入口：不管是 rAF 还是定时器调它，
-     *  都用「距上次推进的真实时间」算位移，所以两边同时触发也不会走两倍速。 */
-    function advance() {
-      var t = now();
-      if (!lastTick) lastTick = t;
-      var dt = Math.min(400, t - lastTick);
-      lastTick = t;
-      if (!stopped()) self.step(dt);
-    }
-    (function rafLoop() { advance(); requestAnimationFrame(rafLoop); })();
-    // 兜底：省电模式、无头环境、某些内嵌浏览器会把 rAF 饿死，
-    // 定时器照看同一套时间差，保证永远在飘。
-    setInterval(advance, 120);
-
-    // 手指 / 鼠标拖拽
-    var sx = 0, down = false;
-    rowEl.addEventListener('pointerdown', function (e) {
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      down = true; sx = e.clientX; rowEl.classList.add('grabbing');
-    });
-    rowEl.addEventListener('pointermove', function (e) {
-      if (!down) return;
-      dragX = e.clientX - sx;
-      self.paint();
-    });
-    function up() {
-      if (!down) return;
-      down = false; rowEl.classList.remove('grabbing');
-      base += -dragX; dragX = 0; self.paint();
-    }
-    rowEl.addEventListener('pointerup', up);
-    rowEl.addEventListener('pointercancel', up);
-    rowEl.addEventListener('pointerleave', up);
-  }
-
-  /** 鼠标/手指进到这两排里就把它们停住，方便看清和点开 */
-  function bindFlowHold() {
-    var zone = $('#flowZone');
-    if (!zone || zone.dataset.holdBound) return;
-    zone.dataset.holdBound = '1';
-    zone.addEventListener('pointerenter', function () { flowHover = true; setFlowDot(); });
-    zone.addEventListener('pointerleave', function () { flowHover = false; setFlowDot(); });
-    zone.addEventListener('focusin', function () { flowHover = true; setFlowDot(); });
-    zone.addEventListener('focusout', function () { flowHover = false; setFlowDot(); });
-    // 手机上点一下就停住，再点空白处继续
-    zone.addEventListener('touchstart', function () { flowHover = true; setFlowDot(); }, { passive: true });
-    document.addEventListener('touchstart', function (e) {
-      if (!zone.contains(e.target)) { flowHover = false; setFlowDot(); }
-    }, { passive: true });
-  }
-
-  function setFlowDot() {
-    var d = $('#flowDot');
-    if (d) d.classList.toggle('paused', flowPaused || flowHover);
-    var btn = $('#flowToggle');
-    if (btn) btn.textContent = flowPaused ? '继续' : '暂停';
-  }
-
-  function renderFlow(list) {
-    // 手机上少放一些，转起来更顺；桌面全放
-    var cap = isPhone() ? 72 : list.length;
-    var use = list.slice(0, cap);
-    var a = use.filter(function (_, i) { return i % 2 === 0; });
-    var b = use.filter(function (_, i) { return i % 2 === 1; });
-    var size = isPhone() ? 54 : 76;
-    function track(arr) {
-      var one = arr.map(function (x) { return cardHTML(x, size); }).join('');
-      return '<div class="flowtrack">' + one + one + '</div>';
+  /* ============================ 两排横滑 ============================
+   * 之前是 JS 逐帧自动平移，卡片一多（两排合计 400 多个 <img>）就卡成幻灯片，
+   * 手机上尤其明显。现在改回浏览器原生的横向滚动：不动就完全静止，
+   * 划动交给 GPU，滚动惯性也是系统原生的手感，几乎不占 CPU。
+   * ================================================================ */
+  function renderRows(list) {
+    var half = Math.ceil(list.length / 2);
+    var size = isPhone() ? 62 : 78;
+    function row(arr) {
+      return '<div class="flowtrack">'
+        + arr.map(function (x) { return cardHTML(x, size); }).join('')
+        + '</div>';
     }
     var ra = $('#flowA'), rb = $('#flowB');
-    ra.innerHTML = track(a);
-    rb.innerHTML = track(b);
-    // 带着上次飘到的位置重建，这样暂停/筛选切换都不会跳回开头
-    marquees = [
-      new Marquee(ra, -1, flowBase.flowA),
-      new Marquee(rb, 1, flowBase.flowB),
-    ];
-    bindFlowHold();
-    // 立刻量一次（同步拿到正确宽度），下一帧再量一次兜底
-    marquees.forEach(function (m) { m.measure(); });
-    requestAnimationFrame(function () { marquees.forEach(function (m) { m.measure(); }); });
-    setFlowDot();
+    var keepA = ra.scrollLeft, keepB = rb.scrollLeft;
+    ra.innerHTML = row(list.slice(0, half));
+    rb.innerHTML = row(list.slice(half));
+    // 重新渲染后把滚动位置还原，别让人白滑
+    ra.scrollLeft = keepA;
+    rb.scrollLeft = keepB;
   }
 
   /* ============================ 渲染 ============================ */
@@ -354,25 +250,21 @@
     $('#count').textContent = list.length === ALL.length
       ? '全部 ' + ALL.length + ' 款'
       : list.length + ' / ' + ALL.length + ' 款';
-    $('#modeTag').textContent = flow ? '轮播中' : '筛选结果';
+    $('#modeTag').textContent = flow ? '左右划看' : '筛选结果';
     $('#modeTag').className = 'tag ' + (flow ? 'live' : 'wait');
     $('#fnum').textContent = activeCount();
     $('#fnum').setAttribute('data-n', activeCount());
     $('#clearBtn').style.display = flow ? 'none' : '';
-    var ft = $('#flowToggle'), fd = $('#flowDot');
-    if (ft) ft.style.display = flow ? '' : 'none';
-    if (fd) fd.style.display = flow ? '' : 'none';
 
     if (flow) {
       $('#flowZone').style.display = '';
       $('#gridZone').style.display = 'none';
-      renderFlow(list);
+      renderRows(list);
     } else {
-      if (marquees.length) { marquees.forEach(function (m) { m.dead = true; }); marquees = []; }
       $('#flowZone').style.display = 'none';
       $('#gridZone').style.display = '';
       $('#gridZone').innerHTML = list.length
-        ? list.map(function (b) { return cardHTML(b, isPhone() ? 54 : 76); }).join('')
+        ? list.map(function (b) { return cardHTML(b, isPhone() ? 62 : 78); }).join('')
         : '<div class="nothing">这些条件凑一块儿，一款都对不上。<br>去掉一两个再试试。</div>';
     }
     drawSummary();
@@ -528,7 +420,6 @@
     }
     if (q.sort && SORTS.some(function (s) { return s[0] === q.sort; })) sortKey = q.sort;
     if (q.q) keyword = q.q.toLowerCase();
-    if (q.pause === '1') flowPaused = true;
     var sb = $('#search'); if (sb && q.q) sb.value = q.q;
     var so = $('#sort'); if (so) so.value = sortKey;
   }
@@ -631,13 +522,6 @@
       toggle.addEventListener('click', function () { setOpen(!panel.classList.contains('open')); });
     }
 
-    // 流动暂停 / 继续（只切状态，不重建，否则会跳回开头）
-    on('#flowToggle', 'click', function () {
-      flowPaused = !flowPaused;
-      setFlowDot();
-      try { localStorage.setItem('drinkdb.flowPaused', flowPaused ? '1' : '0'); } catch (e) {}
-    });
-
     on('#clearBtn', 'click', function () { clearAll(); });
 
     // 导出
@@ -687,17 +571,10 @@
     document.body.style.overflow = '';
   }
 
-  /* 给自测用的小接缝：可以手动把流动推进 N 毫秒，不受帧率影响。
-     暂停（手动或鼠标停住）时同样不动 —— 和 advance() 的行为保持一致。 */
+  /* 给自测用的小接缝 */
   window.__drinkdb = {
-    flow: function () { return marquees; },
-    stepFlow: function (ms) {
-      if (flowPaused || flowHover) return;
-      marquees.forEach(function (m) { m.step(ms); });
-    },
-    isPaused: function () { return flowPaused; },
-    isHeld: function () { return flowHover; },
-    hold: function (v) { flowHover = !!v; setFlowDot(); },
+    rows: function () { return [$('#flowA'), $('#flowB')]; },
+    scrollOf: function () { return [$('#flowA').scrollLeft, $('#flowB').scrollLeft]; },
     state: function () { return active; },
   };
 
@@ -722,8 +599,6 @@
     bind();
     readHash();
     syncChips();
-    try { if (localStorage.getItem('drinkdb.flowPaused') === '1') flowPaused = true; } catch (e) {}
-    setFlowDot();
     if (!window.Store.canLS) $('#lsWarn').style.display = '';
     render();
   }

@@ -20,10 +20,8 @@ window.DRINKDB_CONFIG = {
   apiBase: '',
 
   /* 数据版本（用于导出的文件名） */
-  version: 'v1.1',
+  version: 'v1.2',
 
-  /* 没有筛选时，两排缓慢平移的速度（像素/秒）。数值越小越慢。 */
-  flowSpeed: 30,
 };
 
 window.ADMIN_PASSCODE = window.DRINKDB_CONFIG.adminPasscode;
