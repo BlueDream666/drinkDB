@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fffff8">
+<title>饮库 DrinkDB · 200+ 款饮料，总有一瓶是你想喝的</title>
+<meta name="description" content="200 多款饮料，逐瓶记下含糖量、甜度、气泡强度、气泡能撑多久、咖啡因、酒精和价格。可以按多项条件组合筛选，也能整库导成 Excel。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <div class="logo">饮库<em>DrinkDB</em><em class="sig">by 宿屿</em></div>
+  <div class="spacer"></div>
+  <button class="tb fill" type="button" id="expAll">导全库</button>
+  <button class="tb" type="button" id="expXls">导出<span class="only-wide">筛选结果</span></button>
+  <button class="tb" type="button" id="expCsv">CSV</button>
+  <button class="tb" type="button" id="openSubmit">＋ 补一款</button>
+  <a class="tb" href="admin.html">后台</a>
+</div></div>
+
+<div class="wrap">
+
+  <div class="hero">
+    <h1>200+ 款饮料，总有一瓶是你想喝的</h1>
+    <p>有人在意糖，有人只在意甜，有人就想要那口气。问题是这几样常常对不上：
+       没糖的照样甜，有糖的喝着不甜，标着有气的放一夜就瘪了。
+       这里把每一瓶拆成糖分、甜度、气泡强度、气泡能撑多久、咖啡因、酒精、价格，
+       分开记清楚，再按你在意的那几项去挑。</p>
+
+    <div class="tally">
+      <div><b id="statAll">—</b><span>款饮料</span></div>
+      <div><b id="statApproved">—</b><span>网友补充</span></div>
+      <div><b id="statCats">—</b><span>个门类</span></div>
+    </div>
+    <p id="lsWarn" style="display:none;color:var(--warn);font-size:12.5px;margin-top:8px">
+      这个浏览器把本地存储关了，网友补的条目只能暂存在内存里，刷新就没了。导出不受影响。
+    </p>
+  </div>
+</div>
+
+<!-- ================= 工具条 ================= -->
+<div class="toolbar"><div class="wrap">
+  <div class="row">
+    <input class="search" type="search" id="search" placeholder="搜名字、牌子、备注…" aria-label="搜索">
+    <select class="sortsel" id="sort" aria-label="排序"></select>
+    <button class="tgl" type="button" id="filterToggle" aria-expanded="false" aria-controls="filterPanel">
+      筛选 <b id="fnum" data-n="0">0</b>
+    </button>
+    <button class="tb" type="button" id="clearBtn" style="display:none">清空</button>
+  </div>
+  <div class="tallyline">
+    <span class="dot" id="flowDot"></span>
+    <span id="count">—</span>
+    <span>·</span>
+    <span id="modeTag">轮播中</span>
+    <button class="tb" type="button" id="flowToggle" style="height:24px;font-size:11.5px;padding:0 8px">暂停</button>
+  </div>
+  <div class="summary" id="summary"></div>
+</div></div>
+
+<div class="wrap">
+  <!-- ================= 筛选面板 ================= -->
+  <div class="filters" id="filterPanel">
+    <div id="filterRows"></div>
+    <p class="fhint">
+      <b>用法</b>　按钮三态：一次为「限定」，二次为「排除」，三次取消。同一行多选取并集，跨行取交集。<br>
+      <b>轮播</b>　未施加任何条件时自动轮播；指针进入轮播区即暂停，离开恢复。施加筛选、搜索或排序后转为静态排列。
+    </p>
+  </div>
+
+  <!-- ================= 流动区 ================= -->
+  <div class="flow" id="flowZone">
+    <div class="flowrow" id="flowA"></div>
+    <div class="flowrow" id="flowB"></div>
+  </div>
+
+  <!-- ================= 网格 ================= -->
+  <div class="grid" id="gridZone" style="display:none"></div>
+
+  <footer>
+    <p><b>饮库 DrinkDB</b>　<span id="footAuthor"></span></p>
+    <p>糖、热量、价格为常见规格的参考值。同款换口味、换批次、换地区都可能不同，以包装标签为准。
+       本站只做信息整理，不构成营养或医疗建议。</p>
+    <p>想补充条目，点上方「＋ 补一款」。经整理者审核后收录，并计入导出文件。</p>
+  </footer>
+</div>
+
+<!-- ================= 详情 ================= -->
+<div class="modal" id="detail" role="dialog" aria-modal="true" aria-label="饮料详情">
+  <div class="sheet">
+    <div class="sheetbar">
+      <h2>详情</h2>
+      <button class="tb" type="button" data-close>关闭</button>
+    </div>
+    <div id="detailBody"></div>
+  </div>
+</div>
+
+<!-- ================= 提交 ================= -->
+<div class="modal" id="submit" role="dialog" aria-modal="true" aria-label="补一款饮料">
+  <div class="sheet">
+    <div class="sheetbar">
+      <h2>补一款饮料</h2>
+      <button class="tb" type="button" data-close>关闭</button>
+    </div>
+    <form id="submitForm">
+      <div id="submitBody"></div>
+      <div style="display:flex;gap:9px;margin-top:16px">
+        <button class="tb fill" type="submit" style="height:38px;padding:0 16px">交给我审</button>
+        <button class="tb" type="button" data-close style="height:38px;padding:0 16px">算了</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/config.js"></script>
+<script src="js/data/_schema.js"></script>
+<script src="js/data/01-water-soda.js"></script>
+<script src="js/data/02-tea.js"></script>
+<script src="js/data/03-milk-coffee.js"></script>
+<script src="js/data/04-juice-sport.js"></script>
+<script src="js/data/05-alcohol-other.js"></script>
+<script src="assets/img/manifest.js"></script>
+<script src="js/art.js"></script>
+<script src="js/store.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

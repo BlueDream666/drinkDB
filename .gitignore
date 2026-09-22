@@ -1,0 +1,16 @@
+# 不需要传到仓库里的东西
+.DS_Store
+Thumbs.db
+*.log
+
+# 本地预览 / 抓图脚本的临时产物
+_imgtest.js
+_sitetest.js
+_searchtest.js
+_*.html
+_*.png
+_temp/
+
+# 编辑器
+.vscode/
+.idea/

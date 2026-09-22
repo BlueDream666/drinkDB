@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>饮库自测</title></head>
+<body style="font-family:system-ui;padding:20px">
+<pre id="out">跑着呢…</pre>
+<iframe id="f" src="index.html" style="width:1200px;height:760px;border:1px solid #ccc"></iframe>
+<script>
+var log = [], pass = 0, fail = 0;
+function ok(name, cond, extra) {
+  cond ? pass++ : fail++;
+  log.push((cond ? '✓ ' : '✗ ') + name + (extra !== undefined ? '   → ' + extra : ''));
+}
+function txt(d, id) { var e = d.getElementById(id); return e ? e.textContent.trim() : '(无 #' + id + ')'; }
+function cnt(s) { var m = String(s).match(/(\d+)/); return m ? (+m[1]) : null; }
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function tf(d, id) { var t = d.querySelector('#flow' + id + ' .flowtrack'); return t ? t.style.transform : ''; }
+function px(s) { var m = String(s).match(/translate3d\((-?[\d.]+)px/); return m ? +m[1] : null; }
+
+document.getElementById('f').addEventListener('load', async function () {
+  var w = this.contentWindow, d = this.contentDocument;
+  try {
+    /* ============ A. 默认状态 ============ */
+    ok('默认显示全部 203 款', txt(d, 'count').indexOf('203') >= 0, txt(d, 'count'));
+    ok('默认是流动模式', d.getElementById('flowZone').style.display !== 'none' &&
+                        d.getElementById('gridZone').style.display === 'none');
+    ok('两排都有卡片', d.querySelectorAll('#flowA .card').length > 0 && d.querySelectorAll('#flowB .card').length > 0,
+       'A=' + d.querySelectorAll('#flowA .card').length + ' B=' + d.querySelectorAll('#flowB .card').length);
+
+    /* ============ B. 真的在动（不靠 CSS 动画） ============ */
+    await wait(300);
+    var M = w.__drinkdb.flow();
+    ok('两排都被驱动起来了', M.length === 2 && M[0].width() > 1000, '每排内容宽 ' + (M[0] ? Math.round(M[0].width()) : '?') + 'px');
+
+    var a1 = px(tf(d, 'A')), b1 = px(tf(d, 'B'));
+    w.__drinkdb.stepFlow(1000);          // 手动推进 1 秒，不受无头浏览器帧率影响
+    var a2 = px(tf(d, 'A')), b2 = px(tf(d, 'B'));
+    var speed = w.DRINKDB_CONFIG.flowSpeed;
+    ok('上排往左走，一秒走了 ' + speed + 'px', a2 < a1 && Math.abs((a1 - a2) - speed) < 2, a1 + ' → ' + a2);
+    ok('下排往右走，一秒走了 ' + speed + 'px', b2 > b1 && Math.abs((b2 - b1) - speed) < 2, b1 + ' → ' + b2);
+    ok('下排起点在左侧（约 -内容宽）', b1 < -1000, '起始 x=' + b1);
+    ok('没用 CSS 动画（改由 JS 驱动）',
+       w.getComputedStyle(d.querySelector('#flowA .flowtrack')).animationName === 'none');
+
+    /* ============ C. 暂停：位置不能跳回开头 ============ */
+    var before = px(tf(d, 'A'));
+    d.getElementById('flowToggle').click();
+    ok('点暂停不会跳回开头', Math.abs(px(tf(d, 'A')) - before) < 1.5,
+       before + ' → ' + px(tf(d, 'A')));
+    var p1 = px(tf(d, 'A'));
+    w.__drinkdb.stepFlow(1000);
+    ok('暂停期间推进也不动', px(tf(d, 'A')) === p1 && w.__drinkdb.isPaused(), p1 + ' → ' + px(tf(d, 'A')));
+    ok('暂停时按钮变成「继续」', d.getElementById('flowToggle').textContent.trim() === '继续',
+       d.getElementById('flowToggle').textContent.trim());
+
+    d.getElementById('flowToggle').click();
+    w.__drinkdb.stepFlow(1000);
+    ok('继续后从原地接着走', Math.abs((p1 - px(tf(d, 'A'))) - speed) < 2,
+       p1 + ' → ' + px(tf(d, 'A')) + '（应差 ' + speed + '）');
+
+    /* ============ C2. 指针进到轮播区就停住 ============ */
+    d.getElementById('flowZone').dispatchEvent(new w.PointerEvent('pointerenter', { bubbles: true }));
+    ok('指针进入轮播区 → 停住', w.__drinkdb.isHeld() === true);
+    var h1 = px(tf(d, 'A'));
+    w.__drinkdb.stepFlow(1000);
+    ok('停住期间推进不动', px(tf(d, 'A')) === h1, h1 + ' → ' + px(tf(d, 'A')));
+    d.getElementById('flowZone').dispatchEvent(new w.PointerEvent('pointerleave', { bubbles: true }));
+    ok('指针离开 → 恢复', w.__drinkdb.isHeld() === false);
+    w.__drinkdb.stepFlow(1000);
+    ok('恢复后接着走', Math.abs((h1 - px(tf(d, 'A'))) - speed) < 2, h1 + ' → ' + px(tf(d, 'A')));
+
+    /* ============ D. 三态筛选 ============ */
+    var panel = d.getElementById('filterPanel');
+    if (!panel.classList.contains('open')) d.getElementById('filterToggle').click();
+    d.getElementById('qClear').click();
+
+    var cOK = d.querySelector('.chip[data-k="carb"][data-i="0"]');   // 没气
+    cOK.click();
+    ok('点一下 = 要', cOK.getAttribute('data-st') === '1', 'data-st=' + cOK.getAttribute('data-st'));
+    ok('要了之后切成网格', d.getElementById('gridZone').style.display !== 'none');
+    var want = cnt(txt(d, 'count'));
+    ok('“没气”筛出来是对的', want > 0 && want < 203, txt(d, 'count'));
+
+    cOK.click();
+    ok('点两下 = 不要', cOK.getAttribute('data-st') === '2', 'data-st=' + cOK.getAttribute('data-st'));
+    var no = cnt(txt(d, 'count'));
+    ok('“不要没气”正好是剩下那些', no > 0 && want + no === 203, want + ' + ' + no + ' = ' + (want + no));
+
+    cOK.click();
+    ok('点三下 = 取消', cOK.getAttribute('data-st') === '0', 'data-st=' + cOK.getAttribute('data-st'));
+    ok('取消后回到全部', cnt(txt(d, 'count')) === 203, txt(d, 'count'));
+
+    // 要 + 不要 混着用
+    d.querySelector('.chip[data-k="carb"][data-i="1"]').click();   // 要：有气
+    cOK.click(); cOK.click();                                      // 不要：没气
+    var mixed = cnt(txt(d, 'count'));
+    var expect = w.Store.all().filter(function (b) { return b.cb > 0; }).length;
+    ok('“要有气”+“不要没气”结果自洽', mixed === expect, mixed + ' / 应为 ' + expect);
+    d.getElementById('qClear').click();
+
+    /* ============ E. 跨行 = 且 ============ */
+    d.querySelector('.chip[data-k="carb"][data-i="0"]').click();
+    var s1 = cnt(txt(d, 'count'));
+    d.querySelector('.chip[data-k="sugar"][data-i="0"]').click();
+    var s2 = cnt(txt(d, 'count'));
+    ok('再加一行条件只会更少', s2 < s1 && s2 > 0, s1 + ' → ' + s2);
+
+    // 同一行多选 = 或
+    var s3before = s2;
+    d.querySelector('.chip[data-k="sugar"][data-i="3"]').click();  // 糖挺多（与“一点糖都没有”互斥）
+    var s3 = cnt(txt(d, 'count'));
+    ok('同行多选是「或」', s3 > s3before, s3before + ' → ' + s3);
+    d.getElementById('qClear').click();
+
+    /* ============ F. 摘要 ============ */
+    d.querySelector('.chip[data-k="tea"][data-i="0"]').click();
+    ok('摘要里出现已选条件', d.querySelectorAll('#summary .sm').length === 1,
+       d.querySelectorAll('#summary .sm').length + ' 个');
+    d.querySelector('#summary .sm').click();
+    ok('点摘要能去掉它', d.querySelectorAll('#summary .sm').length === 0);
+    d.getElementById('qClear').click();
+
+    /* ============ G. 快捷 ============ */
+    d.getElementById('qOk').click();
+    var q1 = cnt(txt(d, 'count'));
+    ok('快捷「糖少、没气」', q1 > 0 && q1 < 100, txt(d, 'count'));
+    ok('快捷后不是流动', d.getElementById('flowZone').style.display === 'none');
+    d.getElementById('qClear').click();
+    ok('清空后回到流动', d.getElementById('flowZone').style.display !== 'none');
+
+    /* ============ H. 搜索 / 排序 ============ */
+    var sb = d.getElementById('search');
+    sb.value = '可乐';
+    sb.dispatchEvent(new w.Event('input', { bubbles: true }));
+    var kw = cnt(txt(d, 'count'));
+    ok('搜「可乐」', kw > 0 && kw < 40, txt(d, 'count'));
+    d.getElementById('qClear').click();
+    var so = d.getElementById('sort');
+    ok('排序项够多', so.options.length >= 12, so.options.length + ' 项');
+    so.value = 'sugar-desc';
+    so.dispatchEvent(new w.Event('change', { bubbles: true }));
+    var first = d.querySelector('#gridZone .card .nm');
+    ok('糖分降序，第一张是糖最多的', first && /利口酒|养乐多|维他|星冰乐|安慕希|营养快线/.test(first.textContent),
+       first ? first.textContent : '(空)');
+    d.getElementById('qClear').click();
+
+    /* ============ I. 详情 ============ */
+    d.querySelector('#flowA .card[data-id="coke-classic"]').click();
+    var modal = d.getElementById('detail');
+    ok('点卡片能打开详情', modal.classList.contains('on'));
+    var body = modal.textContent;
+    ok('详情里有「开盖一夜」', /开盖一夜/.test(body));
+    ok('详情里有「衰减幅度」', /衰减幅度/.test(body));
+    ok('详情字段 ≥ 14 个', modal.querySelectorAll('dt').length >= 14, modal.querySelectorAll('dt').length + ' 个');
+    modal.querySelector('[data-close]').click();
+    ok('能关掉详情', !modal.classList.contains('on'));
+
+    /* ============ J. 提交 → 放行 → 入库 ============ */
+    var p0 = w.Store.stats().pending;
+    w.Store.submit({ n: '自测用的柚子茶', b: '自测牌子', c: '无糖茶', sg: '0', s: '0', sw: '2', cb: '0', fd: '0', by: '脚本' });
+    ok('提交进了待审队列', w.Store.stats().pending === p0 + 1, 'pending=' + w.Store.stats().pending);
+    var before = w.Store.all().length;
+    var rec = w.Store.pending().filter(function (x) { return x.n === '自测用的柚子茶'; })[0];
+    w.Store.approve(rec.id);
+    ok('放行后进库', w.Store.all().length === before + 1, before + ' → ' + w.Store.all().length);
+    var added = w.Store.all().filter(function (x) { return x.n === '自测用的柚子茶'; })[0];
+    ok('网友条目结构完整', added && added.c === '无糖茶' && added.hasCarb === false && !!added.brief, added ? added.brief : '(空)');
+    ok('网友条目带来源标记', added && added.fromUser === true);
+    w.Store.restore({ pending: [], approved: [], rejected: [] });
+
+    /* ============ K. 导出 ============ */
+    ok('导出模块在', !!(w.Exporter && w.Exporter.toExcel && w.Exporter.toCSV));
+    ok('导出列数 ≥ 25', w.Exporter.columns.length >= 25, w.Exporter.columns.length + ' 列');
+
+    /* ============ L. 自适应 ============ */
+    ok('网格是自适应列宽（手机上不会横向溢出）',
+       w.getComputedStyle(d.querySelector('.grid')).gridTemplateColumns.split(' ').length >= 2);
+
+  } catch (e) {
+    fail++; log.push('✗ 抛异常：' + e.message + '\n   ' + (e.stack || '').split('\n')[1]);
+  }
+  document.getElementById('out').textContent =
+    'SELFTEST 通过 ' + pass + ' / 失败 ' + fail + '\n\n' + log.join('\n');
+});
+</script>
+</body></html>

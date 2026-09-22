@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fffff8">
+<title>饮库 · 审核台</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <div class="logo">饮库<em>审核台</em></div>
+  <div class="spacer"></div>
+  <a class="tb" href="index.html">← 回前台</a>
+  <button class="tb" type="button" id="logoutBtn" style="display:none">退出</button>
+</div></div>
+
+<div class="wrap">
+
+  <!-- ================= 登录 ================= -->
+  <div id="gate" style="max-width:400px;margin:60px auto 0">
+    <h1 style="font-size:22px;margin-bottom:6px">审核台</h1>
+    <p style="color:var(--muted);font-size:13.5px;margin-top:0">
+      网友只能提交，看不到这个页面。
+    </p>
+    <form id="loginForm" style="display:flex;gap:8px;margin-top:18px">
+      <input type="password" id="pass" placeholder="口令" autocomplete="current-password" aria-label="口令"
+             style="flex:1;min-width:0;border:1px solid var(--rule);background:var(--panel);border-radius:4px;padding:0 12px;height:40px">
+      <button class="tb fill" type="submit" style="height:40px;padding:0 18px">进入</button>
+    </form>
+    <p id="loginErr" style="color:var(--bad);font-size:13px;min-height:1.4em"></p>
+
+    <div style="border-top:1px solid var(--rule);padding-top:14px;margin-top:18px;color:var(--faint);font-size:12px;line-height:1.8">
+      <p style="margin:0 0 6px">口令在 <code>js/config.js</code>，浏览器端比对，仅用于拦截误入，<b>不是安全边界</b>。正式发布前请改为服务端鉴权。</p>
+      <p style="margin:0">审核记录存在本机浏览器，换设备不同步。可用「存个备份 / 读备份」中转。详见 README 第四节。</p>
+    </div>
+  </div>
+
+  <!-- ================= 主体 ================= -->
+  <div id="panel" style="display:none">
+    <div class="hero" style="padding-top:20px">
+      <h1 style="font-size:24px">网友补的，都在这儿</h1>
+      <p>点「通过」，它立刻出现在前台的库里，也会进导出的表。</p>
+      <div class="tally">
+        <div><b id="sPending">0</b><span>等我审</span></div>
+        <div><b id="sApproved">0</b><span>我给过的</span></div>
+        <div><b id="sRejected">0</b><span>我退掉的</span></div>
+        <div><b id="sSeed">0</b><span>我整理的底库</span></div>
+        <div><b id="sTotal">0</b><span>前台现在共</span></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+        <button class="tb fill" type="button" id="exportDbBtn">导全库 Excel</button>
+        <button class="tb" type="button" id="backupBtn">存个备份</button>
+        <label class="tb" style="cursor:pointer">读备份<input type="file" id="restoreFile" accept=".json" hidden></label>
+        <button class="tb" type="button" id="wipeBtn">清掉网友数据</button>
+      </div>
+    </div>
+
+    <h2 style="font-size:17px;margin:26px 0 11px">等我审的</h2>
+    <div class="queue" id="queue"></div>
+
+    <!-- 编辑器 -->
+    <div id="editor" style="display:none;margin-top:26px;border:1px solid var(--accent);border-radius:4px;padding:16px">
+      <h2 style="font-size:16px;margin-bottom:12px">改一改再放行</h2>
+      <form id="editorForm">
+        <div class="fgrid">
+          <div class="field req"><label>叫什么</label><input id="e_n" required></div>
+          <div class="field"><label>牌子</label><input id="e_b"></div>
+          <div class="field"><label>提交人</label><input id="e_by"></div>
+          <div class="field"><label>归哪一类</label><select id="e_c"></select></div>
+          <div class="field"><label>每 100ml 多少克糖</label><input id="e_sg" type="number" step="0.1" min="0"></div>
+          <div class="field"><label>糖分几星（0–5）</label><input id="e_s" type="number" step="0.5" min="0" max="5"></div>
+          <div class="field"><label>喝着多甜（0–5）</label><input id="e_sw" type="number" step="0.5" min="0" max="5"></div>
+          <div class="field"><label>代糖</label><input id="e_sub"></div>
+          <div class="field"><label>代糖后味（0–5）</label><input id="e_at" type="number" step="0.5" min="0" max="5"></div>
+          <div class="field"><label>热量 kcal/100ml</label><input id="e_kc" type="number" step="0.1" min="0"></div>
+          <div class="field"><label>气泡强度（0–5）</label><input id="e_cb" type="number" step="1" min="0" max="5"></div>
+          <div class="field"><label>放一夜还剩气（0–5）</label><input id="e_fd" type="number" step="1" min="0" max="5"></div>
+          <div class="field"><label>冰过以后</label><select id="e_ice">
+            <option value="better">更好喝</option><option value="same">冰不冰都行</option><option value="worse">反而差</option>
+          </select></div>
+          <div class="field"><label>酒精 %vol</label><input id="e_abv" type="number" step="0.1" min="0"></div>
+          <div class="field"><label>咖啡因 mg/100ml</label><input id="e_cf" type="number" step="0.1" min="0"></div>
+          <div class="field"><label>容量 ml</label><input id="e_ml" type="number" step="1" min="0"></div>
+          <div class="field"><label>包装</label><input id="e_pk"></div>
+          <div class="field"><label>价格</label><input id="e_p" type="number" step="0.1" min="0"></div>
+          <div class="field"><label>好不好买（0–5）</label><input id="e_pop" type="number" step="0.5" min="0" max="5"></div>
+          <div class="field"><label>酸不酸（0–5）</label><input id="e_ph" type="number" step="0.5" min="0" max="5"></div>
+          <div class="field"><label>图片网址</label><input id="e_img"></div>
+        </div>
+        <div class="fgrid" style="margin-top:12px">
+          <label class="field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="e_tea"> 有茶</label>
+          <label class="field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="e_dairy"> 有奶</label>
+          <label class="field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="e_hfcs"> 加了果葡糖浆</label>
+        </div>
+        <div class="field" style="margin-top:12px"><label>备注</label><textarea id="e_note" rows="3"></textarea></div>
+        <div style="display:flex;gap:9px;margin-top:15px">
+          <button class="tb fill" type="submit" style="height:38px;padding:0 16px">就按这个放行</button>
+          <button class="tb" type="button" id="editorCancel" style="height:38px;padding:0 16px">不改了</button>
+        </div>
+      </form>
+    </div>
+
+    <h2 style="font-size:17px;margin:30px 0 11px">我已经放行的</h2>
+    <div class="queue" id="approved"></div>
+
+    <h2 style="font-size:17px;margin:30px 0 11px">我退掉的</h2>
+    <div class="queue" id="rejected"></div>
+  </div>
+
+  <footer>
+    <p>底库 203 款在 <code>js/data/*.js</code>。网友的提交和我的审核结果存在这个浏览器的 <code>localStorage</code> 里。</p>
+    <p>所以换台电脑、换个浏览器，这里就空了。要跨设备用得换成服务器上的数据库，「存个备份 / 读备份」可以临时顶一下。</p>
+  </footer>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/config.js"></script>
+<script src="js/data/_schema.js"></script>
+<script src="js/data/01-water-soda.js"></script>
+<script src="js/data/02-tea.js"></script>
+<script src="js/data/03-milk-coffee.js"></script>
+<script src="js/data/04-juice-sport.js"></script>
+<script src="js/data/05-alcohol-other.js"></script>
+<script src="assets/img/manifest.js"></script>
+<script src="js/art.js"></script>
+<script src="js/store.js"></script>
+<script src="js/export.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
