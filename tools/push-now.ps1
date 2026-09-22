@@ -1,4 +1,4 @@
-# 一键把本地仓库推上 GitHub（覆盖远端）
+﻿# 一键把本地仓库推上 GitHub（覆盖远端）
 #
 # 用法：在 F:\饮料统计\ds 下打开 PowerShell，执行
 #     .\tools\push-now.ps1

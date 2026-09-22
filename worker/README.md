@@ -1,5 +1,19 @@
 # 给饮库加一个后端（Cloudflare Worker + D1）
 
+> ## ⚠️ 先看这里：这一步是可选的
+>
+> **不做这个，你的网站也完全是好的。** 挑饮料、筛选、预设、对比、创新区、
+> 导出 Excel、随机抽签——全都不依赖它。
+>
+> 数据库和 Worker 只为一件事服务：**让点赞和评论从「只有你自己看得到」
+> 变成「所有访客共享」**。
+>
+> 现在的状态：点赞和评论能用，页面底部会标着「仅本机可见」。
+> 做完下面这些，它会变成「云端同步」。
+>
+> 觉得麻烦就先放着，worker/ 这个文件夹放在那里不影响任何东西。
+
+
 ## 先说清楚：为什么需要它
 
 现在这个站是**纯静态**的——一堆 html / js / 图片，放到 GitHub Pages 上就能看。
@@ -93,9 +107,20 @@
 
 ## 三、创建 Worker（5 分钟）
 
-1. 左侧栏 **Compute (Workers)** → **Workers & Pages** → 点 **Create**
-2. 选 **Workers** 标签 → **Start with Hello World!** → **Deploy**
-3. 给它起个名字，比如：
+> **注意**：Cloudflare 的界面文字改过好几版。下面按 **2026 年官方文档**的写法来：
+> [First Worker](https://developers.cloudflare.com/learning-paths/workers/get-started/first-worker/)
+> 现在写的是 `Create application` → `Create Worker` → `Deploy`。
+> 如果你找不到某个按钮，直接跳到本文最后「命令行路线」，那条路更稳。
+
+1. 打开 <https://dash.cloudflare.com/?to=/:account/workers-and-pages>
+2. 点右上角 **Create application**（不是 "Create"）
+3. 这一步会进到一个新页面，里面选 **Create Worker** → **Deploy**
+
+   > 如果点了 **Create application** 之后页面卡住或者没反应：
+   > 刷新一下，或者换 Chrome / Edge 打开。这个页面偶尔会加载得很慢。
+   > 实在进不去就往下看「命令行路线」。
+
+4. 给它起个名字，比如：
 
    ```
    drinkdb-api
@@ -109,16 +134,43 @@
 
    **记住这个网址**，后面要用。
 
-4. 点 **Edit code**（编辑代码），把编辑器里原来的示例代码**全选删掉**，
+5. 点 **Edit code**（编辑代码），把编辑器里原来的示例代码**全选删掉**，
    换成 `worker/index.js` 的**全部内容**，点右上角 **Deploy**
 
-5. 验证一下：浏览器打开
+6. 验证一下：浏览器打开
 
    ```
    https://drinkdb-api.你的用户名.workers.dev/
    ```
 
    看到 `{"ok":true,"service":"饮库 DrinkDB API",...}` 就成了。
+
+### 命令行路线（网页上点不动就走这条）
+
+你机器上已经有 Node.js，所以可以直接用官方的 `wrangler` 工具部署，
+**完全不用碰 Cloudflare 的网页界面**。
+
+在 `F:\饮料统计\ds` 下打开 PowerShell：
+
+```powershell
+.\tools\deploy-worker.ps1
+```
+
+脚本会一步步带你走完：登录 → 建数据库 → 建表 → 部署 → 设口令。
+每一步都会停下来让你看清楚，失败了重跑就行（已完成的会自动跳过）。
+
+**它会自己把数据库 ID 写进 `worker/wrangler.toml`**，不用你手动填。
+
+> 想自己敲也行，命令是这几条：
+>
+> ```powershell
+> cd F:\饮料统计\ds\worker
+> npx wrangler login
+> npx wrangler d1 create drinkdb          # 记下输出的 database_id，填进 wrangler.toml
+> npx wrangler d1 execute drinkdb --remote --file=schema.sql
+> npx wrangler deploy
+> npx wrangler secret put ADMIN_TOKEN     # 输入时屏幕不显示字符，是正常的
+> ```
 
 ---
 
