@@ -45,9 +45,49 @@
 5. 建好后进入这个数据库，点顶部的 **Console**（控制台）标签
 6. 把 `worker/schema.sql` 里的**全部内容**粘进输入框，点 **Execute**
 
-   执行成功后会看到三张表：`likes`、`comments`、`suggestions`
+   > **⚠️ 这一步很多人会卡住**：D1 控制台粘贴时**会把换行吃掉**。
+   > 而 SQL 里 `--` 开头的注释是「到本行结尾为止」——换行没了，注释就会把
+   > 后面半句也一起吞掉，于是报 `incomplete input: SQLITE_ERROR`。
+   >
+   > 所以现在的 `schema.sql` 里**故意一条注释都不写**，每条语句压成一行。
+   > 就算换行全丢了，靠分号也能正确切开。
 
-   > 如果一次粘不下，就分三段执行：先建表，再建索引。
+7. **一次执行不完就一条一条来。** 按顺序把这六句分别粘进去、分别点 Execute：
+
+   ```sql
+   CREATE TABLE IF NOT EXISTS likes (bev_id TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0);
+   ```
+
+   ```sql
+   CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, bev_id TEXT NOT NULL, body TEXT NOT NULL, by_name TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL);
+   ```
+
+   ```sql
+   CREATE INDEX IF NOT EXISTS idx_comments_bev ON comments(bev_id, status);
+   ```
+
+   ```sql
+   CREATE INDEX IF NOT EXISTS idx_comments_status ON comments(status);
+   ```
+
+   ```sql
+   CREATE TABLE IF NOT EXISTS suggestions (id INTEGER PRIMARY KEY AUTOINCREMENT, body TEXT NOT NULL, by_name TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL);
+   ```
+
+   ```sql
+   CREATE INDEX IF NOT EXISTS idx_suggests_status ON suggestions(status);
+   ```
+
+8. **怎么确认成功了**：执行这句，返回三行就对：
+
+   ```sql
+   SELECT name FROM sqlite_master WHERE type='table';
+   ```
+
+   应该看到 `likes`、`comments`、`suggestions`。
+
+> 已经建过的表再执行也不会报错（`IF NOT EXISTS`），可以放心重跑。
+> 另外 D1 的 `AUTOINCREMENT` 必须写成 `INTEGER PRIMARY KEY AUTOINCREMENT`，中间不能加别的。
 
 ---
 

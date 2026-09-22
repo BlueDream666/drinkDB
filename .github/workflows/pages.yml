@@ -1,6 +1,11 @@
 name: 部署到 GitHub Pages
 
-# 推到 main 分支就自动发布。也可以在 Actions 页面手动点 Run workflow。
+# 推到 main 就自动发布。也可以在 Actions 页面手动点 Run workflow。
+#
+# 说明：这里用最朴素的写法——把整个仓库原样上传。
+# 不要学网上那种「只 cp 某几个文件到 _site」的写法：一旦加了新目录
+# （比如 img/、worker/）就会漏掉，页面直接白屏。
+
 on:
   push:
     branches: [main]
@@ -20,18 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: 准备要发布的文件
-        run: |
-          mkdir -p _site
-          cp -r index.html admin.html selftest.html css js assets _site/
-          # 说明文档不需要发到线上
-          ls -la _site
-
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: '.'
 
   deploy:
     needs: build
