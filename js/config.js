@@ -27,8 +27,9 @@ window.DRINKDB_CONFIG = {
   adminSalt: '4445b77cd74ac707b974441266a9fdc8',
   adminHash: '58aa86c2f993571831c85a0defd0d4b7fce92e4a892b195a129b0375fde4b51b',
 
-  /* 上线后把这里改成你的后端地址；留空则用浏览器本地存储 */
-  apiBase: '',
+  /* 后端地址。留空 = 本地模式（点赞评论只有自己看得到）；
+     填上 Worker 网址 = 云端同步（所有人共享）。 */
+  apiBase: 'https://drinkdb.bluedream666.workers.dev',
 
   /* 数据版本（用于导出的文件名） */
   version: 'v1.3',
