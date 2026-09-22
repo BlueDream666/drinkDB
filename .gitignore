@@ -3,12 +3,21 @@
 Thumbs.db
 *.log
 
-# 本地预览 / 抓图脚本的临时产物
+# 本地预览 / 抓图 / 测试的临时产物（含无头浏览器的 profile 目录）
+# 注意：不要排掉 js/data/_schema.js —— 它是正式代码，
+# 但 GitHub Pages 默认跑 Jekyll 会跳过 _ 开头的文件，所以仓库根目录必须有 .nojekyll
+_*/
+_*_probe*
+_probe_*
+_prof_*
+_pf_*
+_lv*
+_*.html
+_*.png
+_*.jpg
 _imgtest.js
 _sitetest.js
 _searchtest.js
-_*.html
-_*.png
 _temp/
 
 # 单文件版是构建产物，随时可用 node tools/build-single.js 重新生成
