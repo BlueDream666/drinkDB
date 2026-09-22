@@ -3,6 +3,7 @@
 <body style="font-family:system-ui;padding:20px">
 <pre id="out">跑着呢…</pre>
 <iframe id="f" src="index.html" style="width:1200px;height:760px;border:1px solid #ccc"></iframe>
+<iframe id="fa" src="admin.html" style="display:none"></iframe>
 <script>
 var log = [], pass = 0, fail = 0;
 function ok(name, cond, extra) {
@@ -167,6 +168,35 @@ document.getElementById('f').addEventListener('load', async function () {
     /* ============ L. 自适应 ============ */
     ok('网格是自适应列宽（手机上不会横向溢出）',
        w.getComputedStyle(d.querySelector('.grid')).gridTemplateColumns.split(' ').length >= 2);
+
+    /* ============ M. 审核台口令（只验证「错的进不去」，不验证正确口令）============
+       正确口令是私密的，绝不会出现在这个文件里。
+       想验证自己的口令能不能进，就在浏览器打开 admin.html 手动试一次。 */
+    var fa = document.getElementById('fa');
+    await new Promise(function (r) {
+      // admin.html 早就并行加载好了，所以先看 readyState，别傻等 load 事件
+      if (fa.contentWindow && fa.contentWindow.Store) return r();
+      fa.addEventListener('load', r);
+    });
+    var aw = fa.contentWindow, ad = fa.contentDocument;
+
+    ok('审核台载入了 sha256 模块', typeof aw.sha256Hex === 'function');
+    ok('配置里没有明文口令字段',
+       aw.DRINKDB_CONFIG.adminPasscode === undefined,
+       'adminPasscode=' + aw.DRINKDB_CONFIG.adminPasscode);
+    ok('配置里存的是盐 + 64 位摘要',
+       typeof aw.DRINKDB_CONFIG.adminSalt === 'string' && aw.DRINKDB_CONFIG.adminSalt.length === 32
+       && /^[0-9a-f]{64}$/.test(aw.DRINKDB_CONFIG.adminHash),
+       'salt ' + aw.DRINKDB_CONFIG.adminSalt.length + ' 位，hash ' + aw.DRINKDB_CONFIG.adminHash.length + ' 位');
+    ok('sha256 对已知输入正确',
+       aw.sha256Hex('abc') === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+
+    ok('空口令被拒', aw.Store.login('') === false);
+    ok('瞎猜的口令被拒', aw.Store.login('123456') === false);
+    ok('错口令被拒', aw.Store.login('definitely-not-the-password') === false);
+    ok('失败次数在累计', aw.Store.failCount() >= 3, '已错 ' + aw.Store.failCount() + ' 次');
+    ok('错口令不会给会话', aw.Store.isAdmin() === false);
+    aw.Store.restore({ pending: [], approved: [], rejected: [] });
 
   } catch (e) {
     fail++; log.push('✗ 抛异常：' + e.message + '\n   ' + (e.stack || '').split('\n')[1]);

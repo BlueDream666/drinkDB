@@ -28,13 +28,13 @@
     <form id="loginForm" style="display:flex;gap:8px;margin-top:18px">
       <input type="password" id="pass" placeholder="口令" autocomplete="current-password" aria-label="口令"
              style="flex:1;min-width:0;border:1px solid var(--rule);background:var(--panel);border-radius:4px;padding:0 12px;height:40px">
-      <button class="tb fill" type="submit" style="height:40px;padding:0 18px">进入</button>
+      <button class="tb fill" type="submit" id="loginBtn" style="height:40px;padding:0 18px">进入</button>
     </form>
     <p id="loginErr" style="color:var(--bad);font-size:13px;min-height:1.4em"></p>
 
     <div style="border-top:1px solid var(--rule);padding-top:14px;margin-top:18px;color:var(--faint);font-size:12px;line-height:1.8">
-      <p style="margin:0 0 6px">口令在 <code>js/config.js</code>，浏览器端比对，仅用于拦截误入，<b>不是安全边界</b>。正式发布前请改为服务端鉴权。</p>
-      <p style="margin:0">审核记录存在本机浏览器，换设备不同步。可用「存个备份 / 读备份」中转。详见 README 第四节。</p>
+      <p style="margin:0 0 6px">口令没有存在源码里，只存了「随机盐 + SHA-256 摘要」，别人看源码也反推不出来。改口令：<code>node tools/set-password.js</code></p>
+      <p style="margin:0">审核记录存在本机浏览器，换设备不同步。可用「存个备份 / 读备份」中转。详见 README 第五节。</p>
     </div>
   </div>
 
@@ -119,6 +119,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="js/config.js"></script>
+<script src="js/sha256.js"></script>
 <script src="js/data/_schema.js"></script>
 <script src="js/data/01-water-soda.js"></script>
 <script src="js/data/02-tea.js"></script>

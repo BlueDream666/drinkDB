@@ -22,12 +22,16 @@ node serve.js          # 会打印本机地址和手机地址
 | 页面 | 地址 | 说明 |
 |---|---|---|
 | 前台 | `index.html` | 浏览 / 筛选 / 排序 / 导出 / 提交 |
-| 后台 | `admin.html` | **只有你能进**，审核网友提交（本地版口令见下） |
+| 后台 | `admin.html` | 审核网友提交。口令只有你知道，源码里不存明文 |
 
-本地版后台口令（在 `js/config.js` 里改）：
+审核台口令：**源码里不存明文**，只存「随机盐 + SHA-256 摘要」。改口令：
 
 ```
-drinkdb-admin
+```powershell
+node tools/set-password.js
+```
+
+跑完把 `js/config.js` 传上去就生效。忘了口令就再跑一次重设。
 ```
 
 自测页面：`selftest.html`（浏览器打开，自动跑 40 项功能检查，含三态筛选与流动动画）。
@@ -203,7 +207,7 @@ localStorage 只用来放「运行时新增的东西」（网友提交与审核�
 
 | # | 改什么 | 为什么 |
 |---|---|---|
-| 1 | **`admin.html` 的登录改成服务端鉴权** | 现在的口令写在 `js/config.js`，浏览器端比对，**懂技术的人直接读源码就能绕过**。上线必须换成 Cloudflare Access 邮箱验证码，或 Supabase Auth，或自己签 JWT。 |
+| 1 | **`admin.html` 的登录改成服务端鉴权** | 现在口令只存摘要、看不到明文，但校验仍在前端做，**懂技术的人可以直接改浏览器状态绕过**。要真隔离得靠 Cloudflare Access / Supabase Auth / 自签 JWT。 |
 | 2 | **`js/store.js` 里把 `LocalAdapter` 换成 `RemoteAdapter`** | 否则网友的提交只存在他自己的浏览器里，你永远收不到。 |
 | 3 | **`js/config.js` 的 `apiBase` 填上后端地址** | 前端据此切到远端接口。 |
 
@@ -234,7 +238,8 @@ ds/
 ├── 如何上线与注册域名.md  从零成本上线到绑定域名的操作步骤
 ├── css/style.css
 ├── js/
-│   ├── config.js       站点名 / 署名 / 口令 / API 地址
+│   ├── config.js       站点名 / 署名 / 口令摘要 / API 地址
+│   ├── sha256.js       SHA-256（纯 JS，给口令做摘要用）
 │   ├── art.js          矢量饮料图生成（罐 / 瓶 / 利乐砖 / 咖啡杯 / 奶茶杯 / 啤酒瓶）
 │   ├── store.js        存储层：LocalAdapter（现在）/ RemoteAdapter（上线）
 │   ├── export.js       Excel / CSV / JSON 导出
@@ -254,6 +259,8 @@ ds/
     ├── fetch-images.js    抓产品图（Bing 图片搜）
     ├── shrink-images.js   压产品图（无头浏览器 canvas）
     ├── image-report.js    图片覆盖率 / 体积报告
+    ├── set-password.js    设置审核台口令（只写入摘要）
+    ├── build-single.js    打包成一个可以单独发出去的 html
     ├── push-to-github.ps1 一键推 GitHub
     └── README-推送.md     推送失败的三种解法
 ```

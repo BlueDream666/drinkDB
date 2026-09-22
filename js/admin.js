@@ -13,6 +13,19 @@
   function star(v) { return window.starHTML(Number(v) || 0); }
 
   /* ============================ 登录 ============================ */
+  var LOCK_KEY = 'drinkdb.adminLockUntil';
+  var MAX_TRIES = 5;          // 连续错 5 次
+  var LOCK_MS = 60 * 1000;    // 锁一分钟
+
+  function lockLeft() {
+    var t = 0;
+    try { t = parseInt(localStorage.getItem(LOCK_KEY) || '0', 10); } catch (e) {}
+    return Math.max(0, t - Date.now());
+  }
+  function setLock() {
+    try { localStorage.setItem(LOCK_KEY, String(Date.now() + LOCK_MS)); } catch (e) {}
+  }
+
   function showGate() {
     $('#gate').style.display = '';
     $('#panel').style.display = 'none';
@@ -26,9 +39,36 @@
 
   $('#loginForm').addEventListener('submit', function (e) {
     e.preventDefault();
-    var p = $('#pass').value;
-    if (window.Store.login(p)) { $('#pass').value = ''; $('#loginErr').textContent = ''; showPanel(); }
-    else $('#loginErr').textContent = '口令不对。';
+    var btn = $('#loginBtn'), inp = $('#pass');
+
+    var left = lockLeft();
+    if (left > 0) {
+      $('#loginErr').textContent = '错太多次了，' + Math.ceil(left / 1000) + ' 秒后再试。';
+      return;
+    }
+
+    // 口令校验在浏览器里做，加一点点延迟，抬高暴力猜的成本
+    var pass = inp.value;
+    btn.disabled = true;
+    setTimeout(function () {
+      if (window.Store.login(pass)) {
+        inp.value = '';
+        $('#loginErr').textContent = '';
+        btn.disabled = false;
+        showPanel();
+        return;
+      }
+      var n = window.Store.failCount();
+      btn.disabled = false;
+      if (n >= MAX_TRIES) {
+        setLock();
+        $('#loginErr').textContent = '错 ' + n + ' 次了，锁一分钟。';
+      } else {
+        $('#loginErr').textContent = '口令不对。（已错 ' + n + ' 次，满 ' + MAX_TRIES + ' 次锁一分钟）';
+      }
+      inp.value = '';
+      inp.focus();
+    }, 600);
   });
   $('#logoutBtn').addEventListener('click', function () {
     window.Store.logout();

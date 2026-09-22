@@ -19,6 +19,7 @@
   var K_APPROVED = NS + '.approved';
   var K_REJECTED = NS + '.rejected';
   var K_SESSION = NS + '.admin';
+  var K_FAILS = NS + '.adminFails';
 
   /* ---------- localStorage 可用性探测（file:// 下也可能被禁） ---------- */
   var memory = {};
@@ -105,11 +106,26 @@
       setArr(K_APPROVED, a);
     },
 
-    /* ---------- 管理员会话（本地版：口令比对，仅防误入，不是安全边界） ---------- */
+    /* ---------- 管理员会话 ----------
+     * 口令不存明文，只比对「盐 + SHA-256 摘要」。
+     * 说明：这是纯前端校验，能挡住随手点进来的人，但不是安全边界 ——
+     * 懂技术的人可以直接改浏览器状态绕过。真正的隔离要靠服务端。
+     * 改口令：node tools/set-password.js                                        */
     login: function (pass) {
-      if (pass === global.ADMIN_PASSCODE) { raw(K_SESSION, '1'); return true; }
+      var cfg = global.DRINKDB_CONFIG || {};
+      if (!cfg.adminSalt || !cfg.adminHash) return false;
+      if (typeof global.sha256Hex !== 'function') return false;
+      if (global.sha256Hex(cfg.adminSalt + '|' + pass) === cfg.adminHash) {
+        raw(K_SESSION, '1');
+        raw(K_FAILS, null);
+        return true;
+      }
+      // 记一下错了几次，配合界面上的冷却用
+      var n = parseInt(raw(K_FAILS) || '0', 10) + 1;
+      raw(K_FAILS, String(n));
       return false;
     },
+    failCount: function () { return parseInt(raw(K_FAILS) || '0', 10); },
     logout: function () { raw(K_SESSION, null); },
     isLoggedIn: function () { return raw(K_SESSION) === '1'; },
 
@@ -194,6 +210,7 @@
     submit: function (rec) { return this.adapter.submit(rec); },
     isAdmin: function () { return this.adapter.isLoggedIn(); },
     login: function (p) { return this.adapter.login(p); },
+    failCount: function () { return this.adapter.failCount ? this.adapter.failCount() : 0; },
     logout: function () { this.adapter.logout(); },
     dump: function () { return this.adapter.dump(); },
     restore: function (d) { return this.adapter.restore(d); },
